@@ -30,10 +30,8 @@ public class QuollTransformations implements  Transformation{
 
         q=q.where(functions.not(q.col("base_station_name").like("%WIFI%")));
 
-        UserDefinedFunction ea1sectorNumber=functions.udf((String s)->{
-            System.out.println(s+"========");
-            return  QuollUtils.genSectorNumber(s);
-        }, DataTypes.IntegerType);
+        UserDefinedFunction ea1sectorNumber=functions.udf((String s)-> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
+
         q.show();
         //TODO SECTORNO fix with UDF
         q=q.withColumn("sectorNumber",ea1sectorNumber.apply(q.col("sector")));
