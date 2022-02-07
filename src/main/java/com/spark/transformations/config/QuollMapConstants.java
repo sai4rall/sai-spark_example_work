@@ -51,13 +51,22 @@ public class QuollMapConstants {
             2, "Capacity",
             3, "Other");
 
-//    # Only the following MSC_NODE values are valid. All others are to be ignored. # Note: Implementing this as a Dict in case the names need to be mapped in the future. That's my excuse and I'm sticking to it!
-public static Map<String, String> validiscNodeDict =Map.ofEntries(
-        Map.entry("NSW-ACT-HSCPOOL","NSW-ACT-HSCPOOL"),
-        Map.entry("NSW-PAR-MSCPOOL","NSW-PAR-HSCPOOL"),
-        Map.entry("QLD-NSCPOOL","OLD-HSCPOOL"),
-        Map.entry("SA-NT-NS.CPOOL","SA-NT-HSCPOOL"),
-        Map.entry("VIC-TAS-NSCPOOL","VIC-TAS-HSCPOOL"),
-        Map.entry("WA-NSCPOOL","NA-HSCPOOL"));
+    //    # Only the following MSC_NODE values are valid. All others are to be ignored. # Note: Implementing this as a Dict in case the names need to be mapped in the future. That's my excuse and I'm sticking to it!
+    public static Map<String, String> validiscNodeDict = Map.ofEntries(
+            Map.entry("NSW-ACT-HSCPOOL", "NSW-ACT-HSCPOOL"),
+            Map.entry("NSW-PAR-MSCPOOL", "NSW-PAR-HSCPOOL"),
+            Map.entry("QLD-NSCPOOL", "OLD-HSCPOOL"),
+            Map.entry("SA-NT-NS.CPOOL", "SA-NT-HSCPOOL"),
+            Map.entry("VIC-TAS-NSCPOOL", "VIC-TAS-HSCPOOL"),
+            Map.entry("WA-NSCPOOL", "NA-HSCPOOL"));
+
+
+    public static Map<Integer, String> areaCodeDict = Map.of(
+            2, "02",
+            3, "03",
+            7, "07",
+            8, "08",
+            9, "09");
+
 
 }

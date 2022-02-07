@@ -1,0 +1,6 @@
+nodeb_allocation_id,network,address_id ,node_code,du_number ,site_name ,mecontext_site_nane,remote_node_code,remote_site_name,network_type,nodeb_classification,rbs_id,status,gnb_id,gnb_status,neindex,host_state,virtual_rnc_type,virtual_rnc,rnc_module_Info,comments,allocated_by,requested_by,request_date
+nodeb_allocation_id,network,address_id ,node_code,du_number ,site_name ,mecontext_site_nane,remote_node_code,remote_site_name,network_type,nodeb_classification,rbs_id,status,gnb_id,gnb_status,neindex,host_state,virtual_rnc_type,virtual_rnc,rnc_module_Info,comments,allocated_by,requested_by,request_date
+
+
+header1,header2
+value1,value2
