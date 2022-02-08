@@ -131,6 +131,22 @@ public class QuollUtils {
         }
     }
 
+
+    public static Integer cleanUra(String qStr){
+        if(qStr==null)
+        {
+            return null;
+        }else{
+            if(isInteger(qStr.split(":")[0])){
+                return Integer.parseInt(qStr.split(":")[0]);
+            }else{
+                logger.warn("error cleaning URA field"+ qStr);
+                return null;
+            }
+
+        }
+    }
+
     public static <T> ClassTag<T> classTag(Class<T> clazz) {
         return scala.reflect.ClassManifestFactory.fromClass(clazz);
     }
@@ -149,19 +165,21 @@ public class QuollUtils {
 
     public static String technologyToType(String sTech) {
         if (sTech != null && !sTech.isBlank()) {
-            if(sTech.indexOf("NR")>-1)
+            if (sTech.indexOf("NR") > -1)
                 return "On/nrCell";
-            if (sTech.indexOf("LTE") >-1)
+            if (sTech.indexOf("LTE") > -1)
                 return "ocw/lteCell";
-            else if (sTech.indexOf("WCDMA") >-1)
+            else if (sTech.indexOf("WCDMA") > -1)
                 return "Ocw/umtsCell";
-            else if (sTech.indexOf("GSH") >-1)
+            else if (sTech.indexOf("GSH") > -1)
                 return "ocw/gsmCell";
             else
                 return null;
 
-        }else{
+        } else {
             return null;
-    }
-}
         }
+    }
+
+
+}

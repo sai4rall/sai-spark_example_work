@@ -2,7 +2,7 @@ package com.spark.transformations.config;
 
 public class Constants {
    public static String bucketName = "emrdisco";
-   public static String bucketurl = "S3://emrdisco/";
+   public static String bucketUrl = "S3://emrdisco/";
     public static String bucketOutputPath = "eai_objects/";
 
 
