@@ -181,5 +181,21 @@ public class QuollUtils {
         }
     }
 
+    public static Integer cleanTechnology(String qStr){
+        if(qStr ==null){
+            return null;
+        }else{
+            try{
+//                 # 'NR26G' == 'NR26000'
+                String s=qStr.replace("G","000").substring(2);
+                return Integer.parseInt(s);
+            }catch (Exception e){
+                logger.warn("error cleaning technology field:"+ qStr);
+                return null;
+            }
+        }
+    }
+
+
 
 }

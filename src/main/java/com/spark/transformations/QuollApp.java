@@ -65,21 +65,21 @@ public class QuollApp {
                 .select(q.col("*"),
                         q.col("billing_name").alias("|telstraCellAttributes|billingName"),
                         q.col("roamer").alias("|telstracellAttributes|iroaningAgreement"),
-                        q.col("|telstraCellAttributes|cellFunction"),
-                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        functions.col("|telstraCellAttributes|cellFunction"),
+                        functions.col("|telstraCellAttributes|closedNumberArea"),
                         q.col("coverage_classification").alias("|telstracellAttributes|coverageClassification"),
                         functions.regexp_replace(q.col("coverage_statement"), "[\\n\\r]+", " ").alias("|telstraCellAttributes|coverageStatement"),
-                        q.col("|telstracellAttributes|hasPriorityAssistcustomers"),
-                        q.col("|telstracellAttributes|haswirelessLocalLoopCustomers"),
+                        functions.col("|telstracellAttributes|hasPriorityAssistcustomers"),
+                        functions.col("|telstracellAttributes|haswirelessLocalLoopCustomers"),
                         q.col("optimisation_cluster").alias("|telstraceilAttributes|optimisationCluster"),
                         q.col("sac_dec").alias("|telstraceilAttributes|serviceAreacode").cast(IntegerType$.MODULE$),
                         q.col("owner").alias("|telstraceilAttributes|wirelessServiceOwner"),
-                        q.col("telstracellAttributes|hasSpecialEvent"),
-                        q.col("telstracellAttributes|hassignificantSpecialEvent"),
-                        q.col("telstracellattributes|mobileswitchingCentre"),
-                        q.col("telstraCellAttributes|mobileServiceArea"),
-                        q.col("telstracellAttributes|quolLindex"),
-                        q.col("telstraCellAttributes|hasHighSeasonality"));
+                        functions.col("telstracellAttributes|hasSpecialEvent"),
+                        functions.col("telstracellAttributes|hassignificantSpecialEvent"),
+                        functions.col("telstracellattributes|mobileswitchingCentre"),
+                        functions.col("telstraCellAttributes|mobileServiceArea"),
+                        functions.col("telstracellAttributes|quolLindex"),
+                        functions.col("telstraCellAttributes|hasHighSeasonality"));
 
 //q.show();
         Dataset sites = (q
@@ -93,7 +93,7 @@ public class QuollApp {
                 .withColumn("status", functions.lit("Live"))
                 .withColumn("type", functions.lit("OTHER"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .select("$type", "name", "$retId", "$action", "status", "type", "stateProv", "siteId")    //                      #this is just to re-ord
+                .select("$type", "name", "$refId", "$action", "status", "type", "stateProv", "siteId")    //                      #this is just to re-ord
         );
 //sites.show();
         sites.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site");
@@ -139,7 +139,10 @@ public class QuollApp {
         Dataset bsc_to_bts_lookup = (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))
                 .withColumn("$type", functions.lit("ocw/bsc"))
                 .withColumn("$action", functions.lit("lookup"))
-                .select(q.col("$type"), q.col("bsc_rnc_node").alias("$refId"), q.col("$action"), q.col("bsc_rnc_node").alias("name"))
+                .select(functions.col("$type"),
+                        q.col("bsc_rnc_node").alias("$refId"),
+                        functions.col("$action"),
+                        q.col("bsc_rnc_node").alias("name"))
                 .distinct());
         //bsc_to_bts_lookup.show()
         bsc_to_bts_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc_to_bts_lookup");
@@ -151,7 +154,8 @@ public class QuollApp {
                 .withColumn("$type", functions.lit("ocw/bts"))
                 .withColumn("$bsc", functions.array(functions.col("bsc_rnc_node")))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .select(q.col("cell_name").substr(1, 4).alias("$refId"), q.col("type"), q.col("$action"), q.col("$bsc"),
+                .select(q.col("cell_name").substr(1, 4).alias("$refId"),
+                        q.col("type"), functions.col("$action"), functions.col("$bsc"),
                         q.col("cell_name").substr(1, 4).alias("name"))
                 .distinct());
 //            #bsc_to_bts.show()
@@ -166,9 +170,14 @@ public class QuollApp {
 //                # To keep here as per NNI-1336 and NNI-1622
                 .withColumn("qualifiedCellId", functions.expr("conv(eci, 16, 10)"))
 //                 # Convert eci from hex to decimal
-                .select(q.col("$type"), q.col("cell_name").alias("$refId"), q.col("$action"), q.col("cell_name").alias("name"), q.col("status"),
-                        functions.concat(functions.substring(q.col("technology"), 4, 99), functions.lit("MHz")).alias("band'"),
-                        q.col("qualifiedCellId"), q.col("cellType"), q.col("sectorNumber"),
+                .select(functions.col("$type"),
+                        q.col("cell_name").alias("$refId"),
+                        functions.col("$action"),
+                        q.col("cell_name").alias("name"),
+                        functions.col("status"),
+                        functions.concat(functions.substring(q.col("technology"), 4, 99),
+                                functions.lit("MHz")).alias("band'"),
+                        q.col("qualifiedCellId"), functions.col("cellType"), q.col("sectorNumber"),
                         q.col("cid_dec").alias("cellId").cast(IntegerType$.MODULE$),
 //
 //                # cleanly converts to an integer. However need to validate as per NNI-1630
@@ -212,13 +221,17 @@ public class QuollApp {
                 .withColumn("gprsActivated", UserDefinedFunctions.eaiYN.apply(functions.col("gprs"))) //# values are Yes/No
                 .withColumn("rac", UserDefinedFunctions.eaiInt.apply(functions.col("rac_dec")))
                 .withColumn("|telstraGsmCellAttributes|broadcastCode", UserDefinedFunctions.eaiInt.apply(functions.col("code_for_cell_broadcast")))
-                .select(q.col("$type"), q.col("cell_name").alias("$refId"),
-                        q.col("$action"), q.col("cell_name").alias("name"),
-                        q.col("status"),
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
+                        functions.col("$action"), q.col("cell_name").alias("name"),
+                        functions.col("status"),
                         functions.concat(functions.substring(q.col("technology"), 4, 99),
                                 functions.lit(" MHz")).alias("band"),
-                        q.col("cellType"), q.col("sectorNumber"), //q.col("lac_dec.alias("lac").cast(IntegerType()), # cleanly converts to an integer.
-                        q.col("lac"), q.col("cgi"), q.col("egprsActivated"), q.col("gprsActivated"), q.col("rac"),
+                        functions.col("cellType"), q.col("sectorNumber"), //q.col("lac_dec.alias("lac").cast(IntegerType()), # cleanly converts to an integer.
+                        functions.col("lac"),
+                        q.col("cgi"),
+                        functions.col("egprsActivated"),
+                        functions.col("gprsActivated"),
+                        functions.col("rac"),
                         q.col("cell_inservice_date").alias("originalOnAirDate"),
                         functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"), // Dynamic Attributes
                         q.col("|telstraCellAttributes|billingName"),
@@ -244,6 +257,58 @@ public class QuollApp {
                         q.col("gsm03_38_coding").alias("|telstraGsmCellAttributes|gsm338Coding")));
 //        gsm.show(10, 0, true);
         gsm.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "gsmCell");
+
+
+        Dataset umts = (q.where((q.col("technology").like("WCDMA%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .withColumn("$type", functions.lit("ocw/umtsCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                        //       # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                     //# ocw:telstraCellTypePicklist
+                .withColumn("lac", eaiLac(functions.col("lac_dec")))
+                .withColumn("rac", UserDefinedFunctions.eaiRac.apply(functions.col("rac_dec")))
+                .withColumn("ura", UserDefinedFunctions.eaiUra.apply(functions.col("ura")))
+                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                              //  # Convert string to int via udf
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
+                        functions.col("$action"), q.col("cell_name").alias("name"), functions.col("status"),
+                        functions.concat(functions.substring(q.col("technology"), 6, 99),
+                                functions.lit(" MHz")).alias("band"),
+                        functions.col("cellType"), q.col("cgi"), functions.col("lac"),
+//                        #q.lac_dec.alias('lac').cast(IntegerType()),                       # cleanly converts to an integer.
+                        functions.col("rac"),
+                        functions.col("ura"),
+                        q.col("cid_dec").alias("cellId").cast(IntegerType$.MODULE$),                  //  # cleanly converts to an integer.
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"),
+
+//        # Dynamic Attributes:
+                        q.col("|telstraCellAttributes|billingName"),
+                        q.col("|telstraCellAttributes|roamingAgreement"),
+                        q.col("|telstraCellAttributes|cellFunction"),
+                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("|telstraCellAttributes|coverageClassification"),
+                        q.col("|telstraCellAttributes|coverageStatement"),
+                        q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                        q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                        q.col("|telstraCellAttributes|optimisationCluster"),
+                        q.col("|telstraCellAttributes|serviceAreaCode"),
+                        q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                        q.col("|telstraCellAttributes|hasSpecialEvent"),
+                        q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                        q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                        q.col("|telstraCellAttributes|mobileServiceArea"),
+                        q.col("|telstraCellAttributes|quollIndex"),
+                        q.col("|telstraCellAttributes|hasHighSeasonality"),
+
+                        q.col("ro").alias("|telstraUmtsCellAttributes|routingOrigin").cast(IntegerType$.MODULE$),               //   # cleanly converts to an integer.
+                        q.col("plmn").alias("|telstraUmtsCellAttributes|plmn").cast(IntegerType$.MODULE$)
+                    //  #q.hs_support.alias('|Telstra UMTS Cell Attributes|HS Supported')                      # Deprecated
+                ));
+
+
+            //#umts.show(vertical=True, truncate=False)
+            //#umts.coalesce(1).write.csv(path='s3://emrdisco/eai_objects/umtsCell/csv', mode='overwrite', header=True, quoteAll=True)
+        umts.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "umtsCell");
+
 
 
 
