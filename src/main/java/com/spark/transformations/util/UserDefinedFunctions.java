@@ -27,6 +27,9 @@ public class UserDefinedFunctions {
     public static UserDefinedFunction eaiNameFromMecontext = functions.udf((String s1,Boolean b1) -> QuollUtils.extractNameFromMecontext(s1,b1),DataTypes.StringType);
     public static UserDefinedFunction eaiIdFromMecontext = functions.udf((String s1) -> QuollUtils.extractIdFromMecontext(s1),DataTypes.IntegerType);
     public static UserDefinedFunction eaiEnmGnbType = functions.udf((String s1) -> QuollUtils.enmGnbType(s1),DataTypes.StringType);
+    public static UserDefinedFunction eaiSystemType = functions.udf((String s1) -> QuollUtils.cleanRepeaterTechnology(s1),DataTypes.StringType);
+    public static UserDefinedFunction eaiMcc = functions.udf((String s1) -> QuollUtils.getMcc(s1),DataTypes.IntegerType);
+    public static UserDefinedFunction eaiMnc = functions.udf((String s1) -> QuollUtils.getMnc(s1),DataTypes.StringType);
 
 
 

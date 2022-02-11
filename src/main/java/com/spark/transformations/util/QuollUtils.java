@@ -291,6 +291,56 @@ public static String enmGnbType(String mecontext){
             return "ocw/gnbdu";
         }
 }
+    public static String cleanRepeaterTechnology(String qStr){
+        if(qStr==null){
+            return null;
+        }else{
+            try{
+//                  # 'NR26G' == 'NR26000'
+                if(qStr.endsWith("G")){
+                    qStr = qStr.substring(0,qStr.length()-1) + qStr.replace("G", "000");
+
+                }
+//                      # replace WCDMA with UMTS
+                qStr = qStr.replace("WCDMA", "UMTS");
+                return qStr;
+
+            }catch (Exception e){
+                logger.warn("Error fixing the System Type field"+qStr);
+                return null;
+            }
+        }
+    }
+   public static Integer getMcc(String plmn){
+        if(plmn==null)
+        {
+            return null;
+        }else{
+            try{
+                return Integer.parseInt(plmn.substring(0,3));
+            }catch (Exception e){
+                logger.warn("Error extracting MCC from PLMN:"+plmn);
+                return null;
+            }
+        }
+   }
+    public static String getMnc(String plmn){
+        if(plmn==null)
+        {
+            return null;
+        }else{
+            try{
+                return plmn.substring(3,5);
+            }catch (Exception e){
+                logger.warn("Error extracting MCC from PLMN:"+plmn);
+                return null;
+            }
+        }
+    }
+
+
+
+
 
 
 

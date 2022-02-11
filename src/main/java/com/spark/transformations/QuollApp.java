@@ -8,13 +8,13 @@ import com.spark.transformations.service.QuollTransformations;
 import com.spark.transformations.service.Transformation;
 import com.spark.transformations.util.QuollUtils;
 import com.spark.transformations.util.UserDefinedFunctions;
-import org.apache.hadoop.thirdparty.org.checkerframework.checker.units.qual.C;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.IntegerType$;
 
 import java.util.Arrays;
@@ -447,9 +447,9 @@ public class QuollApp {
 //#bs.select('type').distinct().show()
 //#bs.orderBy(bs.name).coalesce(1).write.csv(path='s3://emrdisco/eai_objects/baseStation/csv', mode='overwrite', header=True, quoteAll=True)
 //#bs.write.json(path='s3://emrdisco/eai_objects/baseStation', mode='overwrite')
-       Dataset nb_e = session.read().option("header","true")
-               .schema(QuollSchemas.enmNodeBSchema)
-               .csv(Constants.enm_nodeB_PATH);
+        Dataset nb_e = session.read().option("header", "true")
+                .schema(QuollSchemas.enmNodeBSchema)
+                .csv(Constants.enm_nodeB_PATH);
 
 
         nb_e = (nb_e
@@ -463,7 +463,7 @@ public class QuollApp {
         );
 
         Dataset enb_e = session.read().schema(QuollSchemas.enmBaseStationSchema)
-                .option("header","true").csv(Constants.enm_nodeBS_PATH);
+                .option("header", "true").csv(Constants.enm_nodeBS_PATH);
 
         enb_e = (enb_e
                 .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
@@ -473,10 +473,10 @@ public class QuollApp {
                         functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
                 .where(functions.col("id").isNotNull())
         );
-       Dataset gnbd_e = session.read()
-               .option("header","true")
-               .schema(QuollSchemas.enmBaseStationSchema)
-               .csv(Constants.GNODEB_DU);
+        Dataset gnbd_e = session.read()
+                .option("header", "true")
+                .schema(QuollSchemas.enmBaseStationSchema)
+                .csv(Constants.GNODEB_DU);
 
         gnbd_e = (gnbd_e
                 .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
@@ -486,11 +486,10 @@ public class QuollApp {
         gnb_e = gnb_e.distinct();
 
 
-
         gnb_e = (gnb_e
                 .withColumn("type", UserDefinedFunctions.eaiEnmGnbType.apply(functions.col("mecontext")))
                 .withColumn("status", functions.lit("In Service"))
-                .select(functions.col("name"), functions.col("id"), functions.col("type"),functions.col("status"),
+                .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
                         functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
         );
 
@@ -498,11 +497,11 @@ public class QuollApp {
         enm = enm.union(enb_e);
         enm = enm.union(gnb_e);
 //        #enm = enm.union(bts.select(bts.name, bts.btsId.alias('id'), bts.type, bts.status, bts.name.alias('nodeCode')))
-       Dataset b3 = bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
+        Dataset b3 = bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
                 bs.col("status").alias("bsstatus"), bs.col("node_code").alias("bsnodeCode"));
 
 //       # For all of the id's that match ENM and SB, keep the ENM version
-       Dataset tmp1 = enm.join(b3, functions.col("id"), "left_outer").select("id", "name", "type", "status", "nodeCode");   //  #for this join get the ENM side
+        Dataset tmp1 = enm.join(b3, functions.col("id"), "left_outer").select("id", "name", "type", "status", "nodeCode");   //  #for this join get the ENM side
 
 //# get the remaining records that are in BS but not in ENM
         Dataset tmp3 = bs.join(enm, functions.col("id"), "left_anti").select(functions.col("id"), functions.col("name"), functions.col("type"), functions.col("status"), bs.col("node_code").alias("nodeCode"));
@@ -515,7 +514,7 @@ public class QuollApp {
 //# TPD-1275 and TPD-1328
         mbs = (mbs
                 .select(mbs.col("id"), mbs.col("name"), mbs.col("type"), mbs.col("status").alias("tmp"), mbs.col("nodeCode"))
-                .withColumn("status", eaiStatus(functions.col("tmp")))
+//                .withColumn("status", eaiStatus(functions.col("tmp")))
                 .withColumn("$refId", functions.col("name"))
                 .withColumn("$type", functions.col("type"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
@@ -530,11 +529,11 @@ public class QuollApp {
 //#   and also tweak the fields we display
 
         Dataset nodeB = mbs.where(mbs.col("type").equalTo("ocw/nodeB"))
-                        .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                                mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
         Dataset eNodeB = mbs.where(mbs.col("type").equalTo("ocw/eNodeB"))
-                        .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                                mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
         Dataset gNBDU = mbs.where(mbs.col("type").equalTo("ocw/gnbdu")).select(functions.col("$type"), functions.col("$refId"),
                 functions.col("$action"), mbs.col("id").alias("gnbduId"), mbs.col("name"), mbs.col("status"));
 //#gNBCUUP = mbs.where(mbs.type == 'ocw/gnbcuup').select('$type', '$refId', '$action', mbs.id.alias('gnbcuupId'), mbs.name, mbs.status)
@@ -565,30 +564,352 @@ public class QuollApp {
 
 
 //# backup :   (q.iub_rbsid.isNotNull()) & (q.technology.like('GSM%')) & (q.cell_status != 'Erroneous entry')
-       Dataset  bts_to_gsmCell = (q
-                .where((q.col("technology").like("GSM%")).and (q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
-    .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
+        Dataset bts_to_gsmCell = (q
+                .where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
 //    #.withColumn('btsId', eaiInt(F.col('iub_rbsid')))
                 .withColumn("$action", functions.lit("createOrUpdate"))
                 .withColumn("$type", functions.lit("ocw/gsmCell"))
                 .withColumn("$bts", functions.array(functions.col("btsName")))
-                .select(functions.col("$type"),  q.col("cell_name").alias("$refId"),functions.col("$action"),
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"), functions.col("$action"),
                         q.col("cell_name").alias("name"), functions.col("$bts"))
-      );
+        );
 
 //#bts_to_gsmCell.show(50)
         bts_to_gsmCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bts_to_gsmCell");
 
 
+        Dataset nodeB_to_umtsCell_lookup = (
+                nodeB.select(functions.col("$type"), nodeB.col("nodeBId").alias("$refId"), nodeB.col("name"))
+                        .withColumn("$action", functions.lit("lookup"))
+                        .distinct()
+        );
+
+//        nodeB_to_umtsCell_lookup.show()
+        nodeB_to_umtsCell_lookup.write().mode("overwrite")
+                .json(Constants.bucketUrl + Constants.bucketOutputPath + "nodeB_to_umtsCell_lookup");
+
+        Dataset nodeB_to_umtsCell = (q.where((q.col("iub_rbsid").isNotNull()).and
+                        (q.col("technology").like("WCDMA%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .withColumn("nodeBId", UserDefinedFunctions.eaiInt.apply(functions.col("iub_rbsid"))).where(functions.col("nodeBId").isNotNull())                          //  # filter out any integer conversion errors
+                .withColumn("$nodeB", functions.array(UserDefinedFunctions.eaiInt.apply(functions.col("iub_rbsid"))))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$type", functions.lit("ocw/umtsCell"))
+                .select(functions.col("$type"), functions.col("$action"),
+                        q.col("cell_name").alias("$refId"), q.col("cell_name").alias("name"), functions.col("$nodeB"))
+        );
+
+        nodeB_to_umtsCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nodeB_to_umtsCell");
 
 
+        Dataset eNodeB_to_lteCell_lookup = (
+                eNodeB
+                        .select(functions.col("$type"),
+                                eNodeB.col("eNodeBId").alias("$refId").cast(DataTypes.StringType), eNodeB.col("name"))
+                        .withColumn("$action", functions.lit("lookup"))
+                        .distinct()
+        );
+
+//#eNodeB_to_lteCell_lookup.show()
+        eNodeB_to_lteCell_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "eNodeB_to_lteCell_lookup");
 
 
+        Dataset eNodeB_to_lteCell = (
+                q.where((q.col("enbid_dec").isNotNull()).and(q.col("technology").like("LTE%")).
+                                and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither", "rruDonor"))))
+                        .withColumn("eNodeBId", UserDefinedFunctions.eaiInt.apply(functions.col("enbid_dec")))
+                        .where(functions.col("eNodeBId").isNotNull())             //# filter out any integer conversion errors
+                        .withColumn("$eNodeB", functions.array(UserDefinedFunctions.eaiInt.apply(functions.col("enbid_dec")).cast(DataTypes.StringType)))                //# Converting this BACK to string as I think the refid (above) really likes a string...FFS
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$type", functions.lit("ocw/lteCell"))
+                        .select(functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
+                                q.col("cell_name").alias("name"), functions.col("$eNodeB"))
+        );
+
+//#eNodeB_to_lteCell.show()
+        eNodeB_to_lteCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "eNodeB_to_lteCell");
 
 
+//# create a list of all of the nrCell to node relationships
+        Dataset c2n = (q.where((q.col("enbid_dec").isNotNull()).and(q.col("technology").like("NR%"))
+                        .and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .withColumn("gNodeBId", UserDefinedFunctions.eaiInt.apply(functions.col("enbid_dec")))
+                .select(functions.col("gNodeBId"), q.col("cell_name"), q.col("technology"), q.col("cell_status"))
+                .where(functions.col("gNodeBId").isNotNull())
+        );
 
 
+//# now join these with the list of base staions so that we can determine if they are du or cu
+
+//#nrCells_to_gnbdu
+        Dataset nrCells_to_gnbdu = (c2n
+                .join(mbs, c2n.col("gNodeBId").equalTo(mbs.col("id")), "leftouter")
+                .where(functions.col("type").equalTo("ocw/gNB-DU"))
+                .select(c2n.col("gNodeBId").alias("gnbduId"),
+                        functions.col("cell_name"))
+//# .show(100)
+//# .coalesce(1).write.csv(path='s3://emrdisco/eai_objects/nrCells_to_gnbdu/csv', mode='overwrite', header=True)
+//# .write.json(path='s3://emrdisco/eai_objects/nrCells_to_gnbdu', mode='overwrite')
+        );
 
 
+//#nrCells_to_gnbcuup
+        Dataset nrCells_to_gnbcuup = (c2n
+                .join(mbs, c2n.col("gNodeBId").equalTo(mbs.col("id")), "leftouter")
+                .where(functions.col("type").equalTo("ocw/gNB-CU-UP"))
+                .select(c2n.col("gNodeBId").alias("gnbcuupId"),
+                        functions.col("cell_name"))
+//# .show(100)
+//# .coalesce(1).write.csv(path='s3://emrdisco/eai_objects/nrCells_to_gnbcuup/csv', mode='overwrite', header=True)
+//# .write.json(path='s3://emrdisco/eai_objects/nrCells_to_gnbcuup', mode='overwrite')
+        );
+//# Lookup the gNodB-DU objects
+        Dataset nrCells_to_gnbdu_lookup = (
+                c2n
+                        .join(gNBDU, (c2n.col("gNodeBId").equalTo(gNBDU.col("gnbduId"))), "inner")    //                # just get the gNodeB's that we need, alos to get the gNodeB's name
+                        .withColumn("$type", functions.lit("ocw/gnbdu"))
+                        .withColumn("$action", functions.lit("lookup"))
+                        .select(
+                                functions.col("$type"), functions.col("$action"),
+                                c2n.col("gNodeBId").alias("$refId"), gNBDU.col("name")
+                        )
+                        .distinct()
+        );
+
+//#nrCells_to_gnbdu_lookup.show()
+        nrCells_to_gnbdu_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nrCells_to_gnbdu_lookup");
+
+
+//# update the nrCells/
+        //TODO need to discuss on duplicate element
+        nrCells_to_gnbdu = (
+                c2n
+                        .withColumn("$type", functions.lit("ocw/nrCell"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$gnbdu", functions.array(functions.col("gNodeBId")))
+                        .select(
+                                functions.col("$type"), functions.col("$action"),
+                                c2n.col("cell_name").alias("$refId"), c2n.col("cell_name").alias("name"),
+                                functions.col("$gnbdu")
+                        )
+                        .distinct()
+        );
+
+//#nrCells_to_gnbdu.show()
+        nrCells_to_gnbdu.write().mode("overwrite")
+                .json(Constants.bucketUrl + Constants.bucketOutputPath + "nrCells_to_gnbdu");
+
+
+        Dataset repeater = (
+                q.where((q.col("rru_donor_node").equalTo("repeater")))
+                        .withColumn("$type", functions.lit("ocw/repeater"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))
+                        .withColumn("|telstraRepeaterAttributes|cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))
+//        ocw:telstraCellTypePicklist
+                        .withColumn("|telstraRepeaterAttributes|hasPriorityAssistCustomers", UserDefinedFunctions.eaiBool.apply(functions.col("priority_assist")))
+                        .withColumn("|telstraRepeaterAttributes|hasWirelessLocalLoopCustomers", UserDefinedFunctions.eaiBool.apply(functions.col("wll")))
+                        .withColumn("|telstraRepeaterAttributes|isSubjecttoEmbargo", UserDefinedFunctions.eaiBool.apply(functions.col("embargo_flag")))
+                        .withColumn("|telstraRepeaterAttributes|hasSpecialEvent", UserDefinedFunctions.eaiBool.apply(functions.col("special_event_cell")))
+                        .withColumn("|telstraRepeaterAttributes|hasSignificantSpecialEvent", UserDefinedFunctions.eaiBool.apply(functions.col("special_event")))
+                        .withColumn("|telstraRepeaterAttributes|hasHighSeasonality", UserDefinedFunctions.eaiBool.apply(functions.col("high_seasonality")))
+                        .withColumn("|telstraRepeaterAttributes|mobileServiceArea", functions.col("msa"))
+                        .withColumn("|telstraRepeaterAttributes|quollIndex", UserDefinedFunctions.eaiInt.apply(functions.col("cell_index")))
+                        .withColumn("systemType", UserDefinedFunctions.eaiSystemType.apply(functions.col("technology")))
+                        .select(
+                                functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
+                                q.col("cell_name").alias("name"), functions.col("status"),
+                                functions.col("systemType"),
+                                q.col("note").alias("comments"),
+//                        # Dynamic Attributes
+                                functions.col("|telstraRepeaterAttributes|cellType"),
+                                q.col("cell_inservice_date").alias("|telstraRepeaterAttributes|originalOnAirDate"),
+                                q.col("coverage_classification").alias("|telstraRepeaterAttributes|coverageClassification"),
+                                q.col("coverage_statement").alias("|telstraRepeaterAttributes|coverageStatement"),
+                                functions.col("|telstraRepeaterAttributes|hasPriorityAssistCustomers"),
+                                functions.col("|telstraRepeaterAttributes|hasWirelessLocalLoopCustomers"),
+                                q.col("optimisation_cluster").alias("|telstraRepeaterAttributes|optimisationCluster"),
+                                q.col("owner").alias("|telstraRepeaterAttributes|wirelessServiceOwner"),
+                                functions.col("|telstraRepeaterAttributes|hasSpecialEvent"),
+                                functions.col("|telstraRepeaterAttributes|hasSignificantSpecialEvent"),
+                                functions.col("|telstraRepeaterAttributes|isSubjecttoEmbargo"),
+                                functions.col("|telstraRepeaterAttributes|hasHighSeasonality"),
+                                functions.col("|telstraRepeaterAttributes|mobileServiceArea"),
+                                functions.col("|telstraRepeaterAttributes|quollIndex")
+                        )
+        );
+
+
+//#repeater.show()
+        repeater.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "repeater");
+
+//        # lookup the cells
+        Dataset rfCell_to_repeater_lookup = (
+                q
+                        .where(q.col("rru_donor_node").equalTo("repeater").and(q.col("active_repeater_donor_node").isNotNull()))
+                        .withColumn("$type", UserDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
+                        .withColumn("$action", functions.lit("lookup"))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("active_repeater_donor_node").alias("$refId"), q.col("active_repeater_donor_node").alias("name")
+                        )
+                        .distinct()
+        );
+
+//#rfCell_to_repeater_lookup.show()
+        rfCell_to_repeater_lookup.write().mode("overwrite")
+                .json(Constants.bucketUrl + Constants.bucketOutputPath + "rfCell_to_repeater_lookup");
+
+//# update the repeaters
+        Dataset rfCell_to_repeater = (
+                q
+                        .where((q.col("rru_donor_node").equalTo("repeater").and(q.col("active_repeater_donor_node").isNotNull())))
+                        .withColumn("$type", functions.lit("ocw/repeater"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$rfCell", functions.array(functions.col("active_repeater_donor_node")))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("cell_name").alias("$refId"), q.col("cell_name").alias("name"),
+                                functions.col("$rfCell")
+                        )
+        );
+
+//#rfCell_to_repeater.show()
+        rfCell_to_repeater.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "rfCell_to_repeater");
+
+
+        Dataset wirelessNetwork = (q
+                .where(q.col("plmn").isNotNull())
+                .where(q.col("plmn").notEqual(99999))
+                .withColumn("$type", functions.lit("ocw/wirelessNetwork"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("country", functions.lit("Australia"))
+                .withColumn("mcc", UserDefinedFunctions.eaiMcc.apply(functions.col("plmn")))
+                .withColumn("mnc", UserDefinedFunctions.eaiMnc.apply(functions.col("plmn")))
+                .withColumn("operatorName", functions.lit("Telstra"))
+                .withColumn("status", functions.lit("ACTIVE"))
+                .select(functions.col("$type"), functions.col("$action"),
+                        q.col("plmn").alias("$refId"), q.col("plmn").alias("name"), functions.col("status"),
+                        functions.col("country"), functions.col("mcc"), functions.col("mnc"), functions.col("operatorName"))
+                .distinct()
+                .orderBy(q.col("plmn"))
+        );
+
+
+//#wirelessNetwork.show()
+        wirelessNetwork.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "wirelessNetwork");
+
+
+        Dataset nrCells_to_wirelessNetwork = (
+                q
+                        .where(q.col("technology").like("NR%")
+                                .and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .where(q.col("plmn").isNotNull())
+                        .withColumn("$type", functions.lit("ocw/nrCell"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$wirelessNetworks", functions.array(functions.col("plmn")))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("cell_name").alias("$refId"),
+                                q.col("cell_name").alias("name"), functions.col("$wirelessNetworks"))
+        );
+
+//#nrCells_to_wirelessNetwork.show()
+        nrCells_to_wirelessNetwork.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nrCells_to_wirelessNetwork");
+
+
+        Dataset nrCells_to_wirelessNetwork_lookup = (
+                q
+                        .where(q.col("technology").like("NR%").and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .where(q.col("plmn").isNotNull())
+                        .withColumn("$type", functions.lit("ocw/wirelessNetwork"))
+                        .withColumn("$action", functions.lit("lookup"))
+//    #.withColumn("$nrCells", functions.array(functions.col("cell_name")))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("plmn").alias("$refId"),
+                                q.col("plmn").alias("name")   //#,"$nrCells"
+                        )
+                        .distinct()
+        );
+
+//#nrCells_to_wirelessNetwork_lookup.show()
+        nrCells_to_wirelessNetwork_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nrCells_to_wirelessNetwork_lookup");
+
+
+        Dataset wirelessNetwork_to_eNodeB_lookup = (
+                q
+                        .where(q.col("technology").like("LTE%").and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .where(q.col("plmn").isNotNull())
+                        .withColumn("$type", functions.lit("ocw/wirelessNetwork"))
+                        .withColumn("$action", functions.lit("lookup"))
+//    #.withColumn("$nrCells",functions.array(F.col("cell_name")))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("plmn").alias("$refId"),
+                                q.col("plmn").alias("name")//#,"$nrCells"
+                        )
+                        .distinct()
+        );
+
+//#wirelessNetwork_to_eNodeB_lookup.show()
+        wirelessNetwork_to_eNodeB_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "wirelessNetwork_to_eNodeB_lookup");
+
+
+//# update eNodeB  ($wirelessNetwork)
+
+        Dataset wirelessNetwork_to_eNodeB = (
+                q
+                        .where(q.col("technology").like("LTE%").and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .where(q.col("plmn").isNotNull())
+                        .withColumn("eNBId", UserDefinedFunctions.eaiInt.apply(functions.col("enbid_dec")))
+                        .join(eNodeB, (functions.col("eNBId").equalTo(eNodeB.col("eNodeBId"))), "inner")
+                        .withColumn("$type", functions.lit("ocw/eNodeB"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$wirelessNetwork", functions.array(functions.col("plmn")))
+                        .select(functions.col("$type"), functions.col("$action"),
+//                        #q.enbid_dec.alias("$refId"), q.enbid_dec.alias("name"),
+                                eNodeB.col("name").alias("$refId"), eNodeB.col("name"),
+                                functions.col("$wirelessNetwork"))
+                        .distinct()
+        );
+
+//#wirelessNetwork_to_eNodeB.show()
+        wirelessNetwork_to_eNodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "wirelessNetwork_to_eNodeB");
+
+
+//# lookup RNC
+
+        Dataset rnc_to_nodeB_lookup = (
+                q.where(q.col("technology").like("WCDMA%").and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .withColumn("qNBId", UserDefinedFunctions.eaiInt.apply(functions.col("iub_rbsid")))
+                        .join(nodeB, (functions.col("qNBId").equalTo(nodeB.col("nodeBId"))), "inner")
+                        .withColumn("$type", functions.lit("ocw/rnc"))
+                        .withColumn("$action", functions.lit("lookup"))
+                        .where(q.col("bsc_rnc_node").isNotNull())
+                        .select(functions.col("$type"), functions.col("$action"),
+                                q.col("bsc_rnc_node").alias("$refId"), q.col("bsc_rnc_node").alias("name")
+                        )
+                        .distinct()
+        );
+
+//#rnc_to_nodeB_lookup.show()
+        rnc_to_nodeB_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "rnc_to_nodeB_lookup");
+
+
+//# update nodeB  ($rnc)
+
+        Dataset rnc_to_nodeB = (
+                q.where(q.col("technology").like("WCDMA%")
+                                .and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                        .withColumn("qNBId", UserDefinedFunctions.eaiInt.apply(functions.col("iub_rbsid")))
+                        .join(nodeB, (functions.col("qNBId").equalTo(nodeB.col("nodeBId"))), "inner")
+                        .where(q.col("bsc_rnc_node").isNotNull())
+                        .withColumn("$type", functions.lit("ocw/nodeB"))
+                        .withColumn("$action", functions.lit("createOrUpdate"))
+                        .withColumn("$rnc", functions.array(q.col("bsc_rnc_node")))
+                        .select(functions.col("$type"), functions.col("$action"),
+                                nodeB.col("name").alias("$refId"), nodeB.col("name"), functions.col("$rnc")
+                        )
+                        .distinct()
+        );
+
+//#rnc_to_nodeB.show()
+        rnc_to_nodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "rnc_to_nodeB");
     }
 }
