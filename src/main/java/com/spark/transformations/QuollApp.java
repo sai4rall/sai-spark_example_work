@@ -8,6 +8,7 @@ import com.spark.transformations.service.QuollTransformations;
 import com.spark.transformations.service.Transformation;
 import com.spark.transformations.util.QuollUtils;
 import com.spark.transformations.util.UserDefinedFunctions;
+import org.apache.hadoop.shaded.org.checkerframework.checker.units.qual.C;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.broadcast.Broadcast;
@@ -312,6 +313,158 @@ public class QuollApp {
 
 
 
+//        758 -930
+        Dataset  nr = (q.where((q.col("technology").like("NR%")).and (q.col("ru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                 .withColumn("$type", functions.lit("ocw/nrCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                            //   # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                 //    # ocw:telstraCellTypePicklist
+                .withColumn("bsChannelBandwidthDownlink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("bsChannelBandwidthUplink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("localCellIdNci", functions.expr("conv(eci, 16, 10)"))                        //  # Convert eci from hex to decimal
+                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                             //   # Convert string to int via udf
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"),functions.col( "$action"), q.col("cell_name").alias("name"),functions.col("status"),
+                        functions.col("bsChannelBandwidthDownlink"), functions.col("bsChannelBandwidthUplink"),
+                        functions.col("cellType"),  functions.col("localCellIdNci"),  functions.col("trackingAreaCode"),
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"),
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+
+//                        # Dynamic Attributes:
+                q.col("telstraCellAttributes|billingName"),
+                q.col("|telstraCellAttributes|roamingAgreement"),
+                q.col("|telstraCellAttributes|cellFunction"),
+                q.col("|telstraCellAttributes|closedNumberArea"),
+                q.col("|telstraCellAttributes|coverageClassification"),
+                q.col("|telstraCellAttributes|coverageStatement"),
+                q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                q.col("|telstraCellAttributes|optimisationCluster"),
+                q.col("|telstraCellAttributes|serviceAreaCode"),
+                q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                q.col("|telstraCellAttributes|hasSpecialEvent"),
+                q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                q.col("|telstraCellAttributes|mobileServiceArea"),
+                q.col("|telstraCellAttributes|quollIndex"),
+                q.col("|telstraCellAttributes|hasHighSeasonality"),
+
+                q.col("cgi").alias("|telstraNrCellAttributes|ncgi")
+         )
+     );
+
+//#nr.show()
+//#nr.coalesce(1).write.csv(path='s3://emrdisco/eai_objects/nrCell/csv', mode='overwrite', header=True, quoteAll=True)
+        nr.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nrCell");
+
+
+    Dataset site_to_rfCell_lookup = (q.where((q.col("rru_donor_node").isin(Arrays.asList("remote","neither"))))
+                .withColumn("$type", functions.lit("oci/site"))
+                .withColumn("$action", functions.lit("LOOKUP"))
+
+                .select(functions.col("$type"), functions.col("$action"),
+                        q.col("base_station_name").alias("$refId"),
+                        q.col("base_station_name").alias("name")
+                )
+                .distinct()
+);
+
+//#site_to_rfCell_lookup.show()
+        site_to_rfCell_lookup.write().mode("overwrite").json(Constants.SITE_TO_RFCELL_LOOKUP_PATH);
+
+
+        Dataset site_to_rfCell = (q.where((q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .withColumn("$type", UserDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$site", functions.array(functions.col("base_station_name")))
+                .select(functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
+                        functions.col("$site"), q.col("cell_name").alias("name")
+                )
+);
+
+//#site_to_rfCell.show()
+        site_to_rfCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site_to_rfCell")
+
+
+
+
+
+//import re
+
+        Broadcast ranNumberingMap = session.sparkContext().broadcast(QuollMapConstants.ranNumberingDict, QuollUtils.classTag(Map.class));
+
+
+        def genEGNodeBName(du, site, nid, nodeCode):
+        """
+        UDF for building the DU if there is no exsting du field.
+        """
+
+        if du == None:
+        try:
+        incChar = ''
+        lte1DigitPattern = re.compile("\(LTE[1-9]\)")
+        m1d = lte1DigitPattern.search(site)
+        lte2DigitPattern = re.compile("\(LTE[1-9][0-9]\)")
+        m2d = lte2DigitPattern.search(site)
+
+            # check for 2 digit increment numbers and convert them to letters
+        if m2d:
+        site = site[m2d.start():]
+        incChar = ''.join(filter(str.isdigit, site))
+        incChar = ranNumberingMap.value[incChar]   # convert to a character
+
+        elif m1d:
+        site = site[m1d.start():]
+        incChar = ''.join(filter(str.isdigit, site))
+
+            else:     # search for single digit increment numbers.
+                # extract out the section within the (), assuming it is at the end of the site string
+                site = site[site.find('('):]
+                # replace '1-x' with just 1.  This seems to be the case for all instances that have a du_number populated.
+                site = site.replace('1-2', '1')
+        site = site.replace('1-3', '1')
+        site = site.replace('1-4', '1')
+                # first remove '3G', '4G', '5G'
+        site = site.replace('3G', '')
+        site = site.replace('4G', '')
+        site = site.replace('5G', '')
+                # Extract out the reamining digits
+                incChar = ''.join(filter(str.isdigit, site))
+
+        if len(incChar) == 1:
+        return nodeCode + incChar + str(int(nid/100000))
+        elif len(incChar) == 0:                          # if no number found assume '1'
+        return nodeCode + '1' + str(int(nid/100000))
+            else:
+        return None
+        except:
+        print('error')
+        return None
+    else:
+        return nodeCode + str(du)
+
+        eaiEGNodeBName = F.udf(genEGNodeBName, StringType())
+
+        def genNodeBName(site, nodeCode):
+        try:
+        pattern = re.compile("\([1-9]\)")
+        m = pattern.search(site)
+        if m:
+        site = site[m.start():]
+        incChar = ''.join(filter(str.isdigit, site))
+        return nodeCode + incChar
+
+        pattern = re.compile("\([1-9][0-9]\)")
+        m = pattern.search(site)
+        if m:
+        site = site[m.start():]
+        incChar = ''.join(filter(str.isdigit, site))
+        return nodeCode + ranNumberingMap.value[incChar]
+
+        # otherwise assume '1'
+        return nodeCode + '1'
+
+        except:
+        return None
 
     }
 }

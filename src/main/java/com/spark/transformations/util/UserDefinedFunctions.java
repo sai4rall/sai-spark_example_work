@@ -19,8 +19,11 @@ public class UserDefinedFunctions {
     public static UserDefinedFunction eaiInt = functions.udf((String s) -> QuollUtils.cleanInt(s), DataTypes.IntegerType);
     public static UserDefinedFunction eaiTechnologyToType = functions.udf((String s) -> QuollUtils.technologyToType(s), DataTypes.StringType);
     public static UserDefinedFunction eaiAreaCode = functions.udf((String s) -> QuollUtils.mapAreaCode(s), DataTypes.StringType);
-    public static UserDefinedFunction eaiUra = functions.udf((String s) -> QuollUtils.cleanUra(s), IntegerType$.MODULE$);
-    public static UserDefinedFunction eaiChannel = functions.udf((String s) -> QuollUtils.cleanTechnology(s), IntegerType$.MODULE$);
+    public static UserDefinedFunction eaiUra = functions.udf((String s) -> QuollUtils.cleanUra(s),DataTypes.IntegerType);
+    public static UserDefinedFunction eaiChannel = functions.udf((String s) -> QuollUtils.cleanTechnology(s),DataTypes.IntegerType);
+    public static UserDefinedFunction eaiBbhType = functions.udf((String s) -> QuollUtils.getBbhType(s),DataTypes.StringType);
+
+
 
 
 }

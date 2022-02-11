@@ -68,5 +68,30 @@ public class QuollMapConstants {
             8, "08",
             9, "09");
 
+    public static Map<String, String> ranNumberingDict = Map.ofEntries(
+            Map.entry("10", "A"),
+            Map.entry("11", "B"),
+            Map.entry("12", "C"),
+            Map.entry("13", "D"),
+            Map.entry("14", "E"),
+            Map.entry("15", "F"),
+            Map.entry("16", "G"),
+            Map.entry("17", "H"),
+            Map.entry("18", "J"),
+            Map.entry("19", "K"),
+            Map.entry("20", "L"),
+            Map.entry("21", "M"),
+            Map.entry("22", "N"),
+            Map.entry("23", "P"),
+            Map.entry("24", "Q"),
+            Map.entry("25", "R"),
+            Map.entry("26", "S"),
+            Map.entry("27", "T"),
+            Map.entry("28", "U"),
+            Map.entry("29", "V"),
+            Map.entry("30", "W"),
+            Map.entry("31", "X"),
+            Map.entry("32", "Y"),
+            Map.entry("33", "Z"));
 
 }

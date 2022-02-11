@@ -16,4 +16,9 @@ public class Constants {
 
 //    public static String BBH_SPREAD_SHEETS_PATH= "s3://emrdisco/bbh/bbhSpreadsheets.csv";
     public static String BBH_SPREAD_SHEETS_PATH= "/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/bbhSpreadsheets.csv";
+
+
+//    public static String SITE_TO_RFCELL_LOOKUP_PATH= "s3://emrdisco/eai_objects/site_to_rfCell_lookup";
+    public static String SITE_TO_RFCELL_LOOKUP_PATH= "/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/site_to_rfCell_lookup";
+
 }

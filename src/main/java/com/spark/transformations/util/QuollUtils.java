@@ -6,6 +6,7 @@ import scala.reflect.ClassTag;
 
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class QuollUtils {
     static Logger logger = Logger.getLogger(QuollUtils.class);
@@ -132,15 +133,14 @@ public class QuollUtils {
     }
 
 
-    public static Integer cleanUra(String qStr){
-        if(qStr==null)
-        {
+    public static Integer cleanUra(String qStr) {
+        if (qStr == null) {
             return null;
-        }else{
-            if(isInteger(qStr.split(":")[0])){
+        } else {
+            if (isInteger(qStr.split(":")[0])) {
                 return Integer.parseInt(qStr.split(":")[0]);
-            }else{
-                logger.warn("error cleaning URA field"+ qStr);
+            } else {
+                logger.warn("error cleaning URA field" + qStr);
                 return null;
             }
 
@@ -180,19 +180,64 @@ public class QuollUtils {
             return null;
         }
     }
-
-    public static Integer cleanTechnology(String qStr){
-        if(qStr ==null){
+    public static String getBbhType(String tech){
+        if(tech ==null)
             return null;
-        }else{
-            try{
+        else{
+            if(tech.indexOf("LTE")>=0){
+                return "ocw/eNodeB;"
+            }
+            if(tech.indexOf("NR")>=0){
+                return "ocw/gnbdu";
+            }
+            return null;
+        }
+    }
+
+
+    public static Integer cleanTechnology(String qStr) {
+        if (qStr == null) {
+            return null;
+        } else {
+            try {
 //                 # 'NR26G' == 'NR26000'
-                String s=qStr.replace("G","000").substring(2);
+                String s = qStr.replace("G", "000").substring(2);
                 return Integer.parseInt(s);
-            }catch (Exception e){
-                logger.warn("error cleaning technology field:"+ qStr);
+            } catch (Exception e) {
+                logger.warn("error cleaning technology field:" + qStr);
                 return null;
             }
+        }
+    }
+//TODO need to verify datatypes of parameters
+
+    public static String genEGNodeBName(Integer du, String site, String nid, String nodeCode):
+
+    {
+        if (du == null) {
+            Pattern lte1DigitPattern = Pattern.compile("\\(LTE[1-9]\\"));//. represents single character
+            boolean m1d = lte1DigitPattern.matcher(site).matches();
+//TODO- DISCUSS LOGIC
+
+            Pattern lte2DigitPattern = Pattern.compile("\\(LTE[1-9][0-9]\\"));
+            boolean m2d = lte1DigitPattern.matcher(site).matches();
+            return null;// temp
+
+        } else {
+            //TODO- DISCUSS LOGIC
+            return nodeCode + String.valueOf(du);
+        }
+
+
+    }
+
+
+    public static String  genNodeBName(String site,String nodeCode){
+        try{
+     // TODO need to discuss logic
+            return null;
+        }catch(Exception e){
+            return null;
         }
     }
 
