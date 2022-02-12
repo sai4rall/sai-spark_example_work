@@ -180,14 +180,15 @@ public class QuollUtils {
             return null;
         }
     }
-    public static String getBbhType(String tech){
-        if(tech ==null)
+
+    public static String getBbhType(String tech) {
+        if (tech == null)
             return null;
-        else{
-            if(tech.indexOf("LTE")>=0){
-                return "ocw/eNodeB;"
+        else {
+            if (tech.indexOf("LTE") >= 0) {
+                return "ocw/eNodeB";
             }
-            if(tech.indexOf("NR")>=0){
+            if (tech.indexOf("NR") >= 0) {
                 return "ocw/gnbdu";
             }
             return null;
@@ -211,16 +212,14 @@ public class QuollUtils {
     }
 //TODO need to verify datatypes of parameters
 
-    public static String genEGNodeBName(Integer du, String site, String nid, String nodeCode):
-
-    {
+    public static String genEGNodeBName(Integer du, String site, String nid, String nodeCode) {
         if (du == null) {
-            Pattern lte1DigitPattern = Pattern.compile("\\(LTE[1-9]\\"));//. represents single character
-            boolean m1d = lte1DigitPattern.matcher(site).matches();
+            //  Pattern lte1DigitPattern = Pattern.compile("\\(LTE[1-9]\\");//. represents single character
+            //   boolean m1d = lte1DigitPattern.matcher(site).matches();
 //TODO- DISCUSS LOGIC
 
-            Pattern lte2DigitPattern = Pattern.compile("\\(LTE[1-9][0-9]\\"));
-            boolean m2d = lte1DigitPattern.matcher(site).matches();
+            //   Pattern lte2DigitPattern = Pattern.compile("\\(LTE[1-9][0-9]\\"));
+            //   boolean m2d = lte1DigitPattern.matcher(site).matches();
             return null;// temp
 
         } else {
@@ -232,14 +231,66 @@ public class QuollUtils {
     }
 
 
-    public static String  genNodeBName(String site,String nodeCode){
-        try{
-     // TODO need to discuss logic
+    public static String genNodeBName(String site, String nodeCode) {
+        try {
+            // TODO need to discuss logic
             return null;
-        }catch(Exception e){
+        } catch (Exception e) {
             return null;
         }
     }
+
+    public static String extractNameFromMecontext(String qStr, Boolean paddOne) {
+        if (paddOne == null) {
+            paddOne = false;
+        }
+        if(qStr==null){
+            return null;
+        }
+        else {
+            try {
+                if (paddOne) {
+                    String tmp = qStr.split("_")[1];
+                    if (tmp.length() == 4) {
+                        return tmp + "1";
+                    } else {
+                        return tmp;
+                    }
+                } else {
+                    return qStr.split("_")[1];
+                }
+
+            } catch (Exception e) {
+                return null;
+            }
+        }
+    }
+
+public static Integer  extractIdFromMecontext(String qStr){
+        if(qStr==null){
+            return null;
+        }else{
+            try {
+                String[] qStrArr=qStr.split("_");
+               return  Integer.parseInt(qStr.split("_")[qStrArr.length-1]);
+            }catch (Exception e){
+                logger.warn("error extracting ID from mecontext for:"+ qStr);
+                return null;
+            }
+        }
+}
+public static String enmGnbType(String mecontext){
+        if(mecontext==null){
+            return null;
+        }
+        if(mecontext.indexOf("_BBH_")>=0) {
+//            #return "ocw/gnbcuup"
+//            # ^ is not required as we now are not including the CU objects.
+            return "ocw/gnbdu";
+        } else {
+            return "ocw/gnbdu";
+        }
+}
 
 
 

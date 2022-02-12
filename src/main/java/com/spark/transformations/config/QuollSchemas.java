@@ -1,9 +1,6 @@
 package com.spark.transformations.config;
 
-import org.apache.spark.sql.types.DateType$;
-import org.apache.spark.sql.types.IntegerType$;
-import org.apache.spark.sql.types.StringType$;
-import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.*;
 
 public class QuollSchemas {
     public static StructType nodeIdSchema = new StructType()
@@ -39,6 +36,10 @@ public class QuollSchemas {
             .add("technology", StringType$.MODULE$, true)
             .add("virtual_rnc", StringType$.MODULE$, true)
             .add("filename", StringType$.MODULE$, true);
+    public static StructType enmNodeBSchema = new StructType()
+            .add("mecontext", DataTypes.StringType, false);
 
-
+    public static StructType enmBaseStationSchema = new StructType()
+            .add("mecontext", DataTypes.StringType, false)
+            .add("id", DataTypes.IntegerType, false);
 }

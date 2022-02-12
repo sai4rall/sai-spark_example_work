@@ -21,7 +21,12 @@ public class UserDefinedFunctions {
     public static UserDefinedFunction eaiAreaCode = functions.udf((String s) -> QuollUtils.mapAreaCode(s), DataTypes.StringType);
     public static UserDefinedFunction eaiUra = functions.udf((String s) -> QuollUtils.cleanUra(s),DataTypes.IntegerType);
     public static UserDefinedFunction eaiChannel = functions.udf((String s) -> QuollUtils.cleanTechnology(s),DataTypes.IntegerType);
+    public static UserDefinedFunction eaiNodeBName = functions.udf((String s1,String s2) -> QuollUtils.genNodeBName(s1,s2),DataTypes.StringType);
     public static UserDefinedFunction eaiBbhType = functions.udf((String s) -> QuollUtils.getBbhType(s),DataTypes.StringType);
+    public static UserDefinedFunction eaiEGNodeBName = functions.udf((Integer i1,String s1,String s2,String s3) -> QuollUtils.genEGNodeBName(i1,s1,s2,s3),DataTypes.StringType);
+    public static UserDefinedFunction eaiNameFromMecontext = functions.udf((String s1,Boolean b1) -> QuollUtils.extractNameFromMecontext(s1,b1),DataTypes.StringType);
+    public static UserDefinedFunction eaiIdFromMecontext = functions.udf((String s1) -> QuollUtils.extractIdFromMecontext(s1),DataTypes.IntegerType);
+    public static UserDefinedFunction eaiEnmGnbType = functions.udf((String s1) -> QuollUtils.enmGnbType(s1),DataTypes.StringType);
 
 
 

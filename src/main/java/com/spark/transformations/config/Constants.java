@@ -21,4 +21,13 @@ public class Constants {
 //    public static String SITE_TO_RFCELL_LOOKUP_PATH= "s3://emrdisco/eai_objects/site_to_rfCell_lookup";
     public static String SITE_TO_RFCELL_LOOKUP_PATH= "/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/site_to_rfCell_lookup";
 
+//    public static String enm_nodeB_PATH="s3://emrdisco/enm/enm_nodeB.csv";
+    public static String enm_nodeB_PATH="/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/enm/enm_nodeB.csv";
+
+//    public static String enm_nodeBS_PATH="s3://emrdisco/enm/enm_eNodeB.csv";
+    public static String enm_nodeBS_PATH="/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/enm/enm_nodeBs.csv";
+
+
+//    public static String GNODEB_DU="s3://emrdisco/enm/enm_gNodeB-DU.csv";
+    public static String GNODEB_DU="/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/enm/enm_gNodeB-DU.csv";
 }
