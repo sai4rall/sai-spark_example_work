@@ -111,6 +111,63 @@ public class QuollUtils {
         );
     }
 
+
+    public Dataset transformBsc(Dataset q) {
+        return (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))
+                .select(q.col("bsc_rnc_node").alias("name"))
+                .distinct()
+                .withColumn("status", functions.lit("UNKNOWN"))
+                .withColumn("$type", functions.lit("ocw/bsc"))
+                .withColumn("$action", functions.lit("createrOrUpdate"))
+                .withColumn("$refId", functions.col("name"))
+                .select("$type", "$action", "$refId", "name", "status")           //  #  datasync requires the attributes to be first
+        );
+    }
+
+    public Dataset transformRnc(Dataset q) {
+        return (q.where(functions.not(q.col("technology").like("GSM%")).and(q.col("bsc_rnc_node").isNotNull()))
+                .select(q.col("bsc_rnc_node").alias("name"))
+                .distinct()
+                .withColumn("status", functions.lit("UNKNOWN"))
+                .withColumn("$type", functions.lit("ocw/rnc"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$refId", functions.col("name"))
+                .select("$type", "$action", "$refId", "name", "status")
+);
+    }
+
+    public Dataset transfromBts(Dataset q) {
+        return  (q
+                .where(q.col("technology").like("GSM%")) // q.iub_rbsid.isNotNull() & & (q.cell_status != "Erroneous entry")
+                .select(q.col("cell_name").substr(1, 4).alias("name"), q.col("iub_rbsid").alias("btsId"))
+                .withColumn("$type", functions.lit("ocw/bts"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$refId", functions.col("name"))
+                .withColumn("status", functions.lit("UNKNOWN"))
+                .distinct()
+                .select("$type", "$action", "$refId", "name", "status", "btsId"));  // dataSync requires the $ attributes to be first
+        //bts.show()
+    }
+    public Dataset transfromBscToBtsLookup(Dataset q) {
+        return    (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))
+                .withColumn("$type", functions.lit("ocw/bsc"))
+                .withColumn("$action", functions.lit("lookup"))
+                .select(functions.col("$type"),
+                        q.col("bsc_rnc_node").alias("$refId"),
+                        functions.col("$action"),
+                        q.col("bsc_rnc_node").alias("name"))
+                .distinct());
+    }
+    public Dataset transfromBscToBts(Dataset q) {
+        return        (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))// #q.iub_rbsid.isNotNull() & & (q.cell_status != 'Erroneous entry')
+                .withColumn("$type", functions.lit("ocw/bts"))
+                .withColumn("$bsc", functions.array(functions.col("bsc_rnc_node")))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .select(q.col("cell_name").substr(1, 4).alias("$refId"),
+                        functions.col("$type"), functions.col("$action"), functions.col("$bsc"),
+                        q.col("cell_name").substr(1, 4).alias("name"))
+                .distinct());
+    }
     public static Integer genSectorNumber(String sector) {
 
         if (sector != null && !sector.isBlank()) {
@@ -132,12 +189,12 @@ public class QuollUtils {
 
     public static String mapStatus(String Status) {
 //          # note: we cannot have a status on None as the record will not load into EAI
-        return QuollMapConstants.statusMapDict.get(Status) != null ? QuollMapConstants.cellStatusMapDict.get(Status) : QuollMapConstants.cellStatusMapDict.get("Unknown");
+        return QuollMapConstants.statusMapDict.get(Status) != null ? QuollMapConstants.statusMapDict.get(Status) : QuollMapConstants.statusMapDict.get("Unknown");
     }
 
     public static String mapCellType(String qType) {
 //          # note: we cannot have a status on None as the record will not load into EAI
-        return QuollMapConstants.cellTypeMapDict.get(qType) != null ? QuollMapConstants.cellTypeMapDict.get(qType) : QuollMapConstants.cellStatusMapDict.get("TBA");
+        return QuollMapConstants.cellTypeMapDict.get(qType) != null ? QuollMapConstants.cellTypeMapDict.get(qType) : QuollMapConstants.cellTypeMapDict.get("TBA");
     }
 
     public static String mapCellFunction(String qFunction) {

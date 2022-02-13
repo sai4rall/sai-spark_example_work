@@ -49,66 +49,29 @@ public class QuollApp {
 //sites.show();
         sites.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site");
 
-        Dataset bsc = (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))
-                .select(q.col("bsc_rnc_node").alias("name"))
-                .distinct()
-                .withColumn("status", functions.lit("UNKNOWN"))
-                .withColumn("$type", functions.lit("ocw/bsc"))
-                .withColumn("$action", functions.lit("createrOrUpdate"))
-                .withColumn("$refId", functions.col("name"))
-                .select("$type", "$action", "$refld", "name", "status")           //  #  datasync requires the attributes to be first
-        );
+        Dataset bsc =quollUtils.transformBsc(q);
 
         bsc.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc");
 //                #bsc.show()
 
 //        q.show();
-        Dataset rnc = (q.where(functions.not(q.col("technology").like("GSM%")).and(q.col("bsc_rnc_node").isNotNull())))
-                .select(q.col("bsc_rnc_node").alias("name"))
-                .distinct()
-                .withColumn("status", functions.lit("UNKNOWN"))
-                .withColumn("$type", functions.lit("ocw/rnc"))
-                .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("$refId", functions.col("name"))
-                .select("$type", "$action", "$refId", "name", "status");
+        Dataset rnc =quollUtils.transformRnc(q);
         rnc.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc");
         rnc.show();
 
 
-        Dataset bts = (q
-                .where(q.col("technology").like("GSM%")) // q.iub_rbsid.isNotNull() & & (q.cell_status != "Erroneous entry")
-                .select(q.col("cell_name").substr(1, 4).alias("name"), q.col("iub_rbsid").alias("btsId"))
-                .withColumn("$type", functions.lit("ocw/bts"))
-                .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("$refunctionsId", functions.col("name"))
-                .withColumn("status", functions.lit("UNKNOWN"))
-                .distinct()
-                .select("$type", "$action", "$refId", "name", "status", "btsId"));  // dataSync requires the $ attributes to be first
-        //bts.show()
+        Dataset bts = quollUtils.transfromBts(q);
         bts.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bts");
 
-        Dataset bsc_to_bts_lookup = (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))
-                .withColumn("$type", functions.lit("ocw/bsc"))
-                .withColumn("$action", functions.lit("lookup"))
-                .select(functions.col("$type"),
-                        q.col("bsc_rnc_node").alias("$refId"),
-                        functions.col("$action"),
-                        q.col("bsc_rnc_node").alias("name"))
-                .distinct());
+        Dataset bsc_to_bts_lookup =  quollUtils.transfromBscToBtsLookup (q);
+
         //bsc_to_bts_lookup.show()
         bsc_to_bts_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc_to_bts_lookup");
 
 
 //           # now get the list of the bts's that will link to them
+        Dataset bsc_to_bts = quollUtils.transfromBscToBts(q);
 
-        Dataset bsc_to_bts = (q.where(q.col("technology").like("GSM%").and(q.col("bsc_rnc_node").isNotNull()))// #q.iub_rbsid.isNotNull() & & (q.cell_status != 'Erroneous entry')
-                .withColumn("$type", functions.lit("ocw/bts"))
-                .withColumn("$bsc", functions.array(functions.col("bsc_rnc_node")))
-                .withColumn("$action", functions.lit("createOrUpdate"))
-                .select(q.col("cell_name").substr(1, 4).alias("$refId"),
-                        q.col("type"), functions.col("$action"), functions.col("$bsc"),
-                        q.col("cell_name").substr(1, 4).alias("name"))
-                .distinct());
 //            #bsc_to_bts.show()
         bsc_to_bts.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc_to_bts");
 
