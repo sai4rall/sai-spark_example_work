@@ -4,11 +4,8 @@ import com.spark.transformations.config.ClusterConfig;
 import com.spark.transformations.config.Constants;
 import com.spark.transformations.config.QuollMapConstants;
 import com.spark.transformations.config.QuollSchemas;
-import com.spark.transformations.service.QuollTransformations;
-import com.spark.transformations.service.Transformation;
 import com.spark.transformations.util.QuollUtils;
 import com.spark.transformations.util.UserDefinedFunctions;
-import org.apache.hadoop.thirdparty.org.checkerframework.checker.units.qual.C;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.broadcast.Broadcast;
@@ -27,23 +24,14 @@ public class QuollApp {
 
         Logger.getLogger("org").setLevel(Level.ERROR);
         SparkSession session = ClusterConfig.getSparkSession();
-
+        QuollUtils quollUtils = new QuollUtils();
 
         //TODO need to change to database
-        Dataset qdf = session
-                .read().option("header", "true").csv("/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/testone.csv");
-        Transformation quollTransformations = new QuollTransformations();
-        Dataset q = quollTransformations.apply(qdf);
+        Dataset qdf =quollUtils.readFile(session,null,"/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/testone.csv");
+        Dataset q = quollUtils.applyInitialTrabsformaions(qdf);
+        Dataset t = quollUtils.readFile(session,QuollSchemas.nodeIdSchema,Constants.TEMPEST_NODE_ID_PATH);
+        Dataset b = quollUtils.readFile(session,QuollSchemas.bbhSpreadsheetSchema,Constants.TEMPEST_NODE_ID_PATH);
 
-
-        Dataset t = session.read().option("header", "true")
-                .schema(QuollSchemas.nodeIdSchema)
-                .csv(Constants.TEMPEST_NODE_ID_PATH);
-
-
-        Dataset b = session.read().option("header", "true")
-                .schema(QuollSchemas.bbhSpreadsheetSchema)
-                .csv(Constants.TEMPEST_NODE_ID_PATH);
 
 
         Broadcast cellStatusMap = session.sparkContext().broadcast(QuollMapConstants.cellStatusMapDict, QuollUtils.classTag(Map.class));
@@ -52,50 +40,12 @@ public class QuollApp {
         Broadcast cellFunction = session.sparkContext().broadcast(QuollMapConstants.cellFunctionbict, QuollUtils.classTag(Map.class));
         Broadcast validscnodes = session.sparkContext().broadcast(QuollMapConstants.validiscNodeDict, QuollUtils.classTag(Map.class));
         Broadcast areaCode = session.sparkContext().broadcast(QuollMapConstants.areaCodeDict, QuollUtils.classTag(Map.class));
-        q = q.
-                withColumn("|telstraCellAttributes|cellFunction", UserDefinedFunctions.eaiCellFunction.apply(q.col("cell_function"))).
-                withColumn("|telstraCellAttributes|hasSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event_cell"))).
-                withColumn("|telstraCellAttributes|hasSignificantSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event"))).
-                withColumn("|telstraCellAttributes|hasPriorityAssistCustomers", UserDefinedFunctions.eaiBool.apply(q.col("priority_assist"))).
-                withColumn("|telstraCellAttributes|hasHighSeasonality", UserDefinedFunctions.eaiBool.apply(q.col("high_seasonality"))).
-                withColumn("|telstraCellAttributes|hasWirelessLocalLoopCustomers", UserDefinedFunctions.eaiBool.apply(q.col("wll"))).
-                withColumn("|telstraCellAttributes|mobileSwitchingCenter", UserDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
-                withColumn("|telstraCellAttributes|mobileServiceArea", q.col("msa")).
-                withColumn("|telstraCellAttributes|quollIndex", UserDefinedFunctions.eaiInt.apply(q.col("cell_index"))).
-                withColumn("|telstraCellAttributes|closedNumberArea", UserDefinedFunctions.eaiAreaCode.apply(q.col("cna")))
-                .select(q.col("*"),
-                        q.col("billing_name").alias("|telstraCellAttributes|billingName"),
-                        q.col("roamer").alias("|telstracellAttributes|iroaningAgreement"),
-                        functions.col("|telstraCellAttributes|cellFunction"),
-                        functions.col("|telstraCellAttributes|closedNumberArea"),
-                        q.col("coverage_classification").alias("|telstracellAttributes|coverageClassification"),
-                        functions.regexp_replace(q.col("coverage_statement"), "[\\n\\r]+", " ").alias("|telstraCellAttributes|coverageStatement"),
-                        functions.col("|telstracellAttributes|hasPriorityAssistcustomers"),
-                        functions.col("|telstracellAttributes|haswirelessLocalLoopCustomers"),
-                        q.col("optimisation_cluster").alias("|telstraceilAttributes|optimisationCluster"),
-                        q.col("sac_dec").alias("|telstraceilAttributes|serviceAreacode").cast(IntegerType$.MODULE$),
-                        q.col("owner").alias("|telstraceilAttributes|wirelessServiceOwner"),
-                        functions.col("telstracellAttributes|hasSpecialEvent"),
-                        functions.col("telstracellAttributes|hassignificantSpecialEvent"),
-                        functions.col("telstracellattributes|mobileswitchingCentre"),
-                        functions.col("telstraCellAttributes|mobileServiceArea"),
-                        functions.col("telstracellAttributes|quolLindex"),
-                        functions.col("telstraCellAttributes|hasHighSeasonality"));
 
+
+        q = quollUtils.addAdditionalAttributes(q);
 //q.show();
-        Dataset sites = (q
-                .select(q.col("base_station_name").alias("name"),
-                        q.col("base_station_name").alias("Srefld"),
-                        q.col("state").alias("stateProv"),
-                        q.col("nm_address_id").alias("siteId").cast(IntegerType$.MODULE$)//  = # cleanly converts to an integer
-                )
-                .distinct()
-                .withColumn("$type", functions.lit("oci/site"))
-                .withColumn("status", functions.lit("Live"))
-                .withColumn("type", functions.lit("OTHER"))
-                .withColumn("$action", functions.lit("createOrUpdate"))
-                .select("$type", "name", "$refId", "$action", "status", "type", "stateProv", "siteId")    //                      #this is just to re-ord
-        );
+        Dataset sites =  quollUtils.cleanlyConvertssitesToInteger(q);
+
 //sites.show();
         sites.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site");
 
@@ -447,9 +397,9 @@ public class QuollApp {
 //#bs.select('type').distinct().show()
 //#bs.orderBy(bs.name).coalesce(1).write.csv(path='s3://emrdisco/eai_objects/baseStation/csv', mode='overwrite', header=True, quoteAll=True)
 //#bs.write.json(path='s3://emrdisco/eai_objects/baseStation', mode='overwrite')
-       Dataset nb_e = session.read().option("header","true")
-               .schema(QuollSchemas.enmNodeBSchema)
-               .csv(Constants.enm_nodeB_PATH);
+        Dataset nb_e = session.read().option("header", "true")
+                .schema(QuollSchemas.enmNodeBSchema)
+                .csv(Constants.enm_nodeB_PATH);
 
 
         nb_e = (nb_e
@@ -463,7 +413,7 @@ public class QuollApp {
         );
 
         Dataset enb_e = session.read().schema(QuollSchemas.enmBaseStationSchema)
-                .option("header","true").csv(Constants.enm_nodeBS_PATH);
+                .option("header", "true").csv(Constants.enm_nodeBS_PATH);
 
         enb_e = (enb_e
                 .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
@@ -473,10 +423,10 @@ public class QuollApp {
                         functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
                 .where(functions.col("id").isNotNull())
         );
-       Dataset gnbd_e = session.read()
-               .option("header","true")
-               .schema(QuollSchemas.enmBaseStationSchema)
-               .csv(Constants.GNODEB_DU);
+        Dataset gnbd_e = session.read()
+                .option("header", "true")
+                .schema(QuollSchemas.enmBaseStationSchema)
+                .csv(Constants.GNODEB_DU);
 
         gnbd_e = (gnbd_e
                 .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
@@ -486,11 +436,10 @@ public class QuollApp {
         gnb_e = gnb_e.distinct();
 
 
-
         gnb_e = (gnb_e
                 .withColumn("type", UserDefinedFunctions.eaiEnmGnbType.apply(functions.col("mecontext")))
                 .withColumn("status", functions.lit("In Service"))
-                .select(functions.col("name"), functions.col("id"), functions.col("type"),functions.col("status"),
+                .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
                         functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
         );
 
@@ -498,11 +447,11 @@ public class QuollApp {
         enm = enm.union(enb_e);
         enm = enm.union(gnb_e);
 //        #enm = enm.union(bts.select(bts.name, bts.btsId.alias('id'), bts.type, bts.status, bts.name.alias('nodeCode')))
-       Dataset b3 = bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
+        Dataset b3 = bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
                 bs.col("status").alias("bsstatus"), bs.col("node_code").alias("bsnodeCode"));
 
 //       # For all of the id's that match ENM and SB, keep the ENM version
-       Dataset tmp1 = enm.join(b3, functions.col("id"), "left_outer").select("id", "name", "type", "status", "nodeCode");   //  #for this join get the ENM side
+        Dataset tmp1 = enm.join(b3, functions.col("id"), "left_outer").select("id", "name", "type", "status", "nodeCode");   //  #for this join get the ENM side
 
 //# get the remaining records that are in BS but not in ENM
         Dataset tmp3 = bs.join(enm, functions.col("id"), "left_anti").select(functions.col("id"), functions.col("name"), functions.col("type"), functions.col("status"), bs.col("node_code").alias("nodeCode"));
@@ -515,7 +464,8 @@ public class QuollApp {
 //# TPD-1275 and TPD-1328
         mbs = (mbs
                 .select(mbs.col("id"), mbs.col("name"), mbs.col("type"), mbs.col("status").alias("tmp"), mbs.col("nodeCode"))
-                .withColumn("status", eaiStatus(functions.col("tmp")))
+//                .withColumn("status", eaiStatus(functions.col("tmp")))  //TODO need info
+
                 .withColumn("$refId", functions.col("name"))
                 .withColumn("$type", functions.col("type"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
@@ -530,11 +480,11 @@ public class QuollApp {
 //#   and also tweak the fields we display
 
         Dataset nodeB = mbs.where(mbs.col("type").equalTo("ocw/nodeB"))
-                        .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                                mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
         Dataset eNodeB = mbs.where(mbs.col("type").equalTo("ocw/eNodeB"))
-                        .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                                mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
         Dataset gNBDU = mbs.where(mbs.col("type").equalTo("ocw/gnbdu")).select(functions.col("$type"), functions.col("$refId"),
                 functions.col("$action"), mbs.col("id").alias("gnbduId"), mbs.col("name"), mbs.col("status"));
 //#gNBCUUP = mbs.where(mbs.type == 'ocw/gnbcuup').select('$type', '$refId', '$action', mbs.id.alias('gnbcuupId'), mbs.name, mbs.status)
@@ -565,29 +515,19 @@ public class QuollApp {
 
 
 //# backup :   (q.iub_rbsid.isNotNull()) & (q.technology.like('GSM%')) & (q.cell_status != 'Erroneous entry')
-       Dataset  bts_to_gsmCell = (q
-                .where((q.col("technology").like("GSM%")).and (q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
-    .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
+        Dataset bts_to_gsmCell = (q
+                .where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
 //    #.withColumn('btsId', eaiInt(F.col('iub_rbsid')))
                 .withColumn("$action", functions.lit("createOrUpdate"))
                 .withColumn("$type", functions.lit("ocw/gsmCell"))
                 .withColumn("$bts", functions.array(functions.col("btsName")))
-                .select(functions.col("$type"),  q.col("cell_name").alias("$refId"),functions.col("$action"),
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"), functions.col("$action"),
                         q.col("cell_name").alias("name"), functions.col("$bts"))
-      );
+        );
 
 //#bts_to_gsmCell.show(50)
         bts_to_gsmCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bts_to_gsmCell");
-
-
-
-
-
-
-
-
-
-
 
 
     }

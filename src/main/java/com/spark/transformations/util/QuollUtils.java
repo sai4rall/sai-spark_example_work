@@ -1,7 +1,17 @@
 package com.spark.transformations.util;
 
+import com.spark.transformations.config.Constants;
 import com.spark.transformations.config.QuollMapConstants;
+import com.spark.transformations.config.QuollSchemas;
 import org.apache.log4j.Logger;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.expressions.UserDefinedFunction;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.IntegerType$;
+import org.apache.spark.sql.types.StructType;
 import scala.reflect.ClassTag;
 
 import java.util.Arrays;
@@ -10,6 +20,96 @@ import java.util.regex.Pattern;
 
 public class QuollUtils {
     static Logger logger = Logger.getLogger(QuollUtils.class);
+
+    public Dataset readFile(SparkSession session, StructType schema, String path) {
+        if (schema == null) {
+            return session
+                    .read().option("header", "true").csv(path);
+        } else {
+            return session.read().option("header", "true")
+                    .schema(schema)
+                    .csv(path);
+        }
+
+    }
+
+    public Dataset applyInitialTrabsformaions(Dataset qdf) {
+//# Add in the sector
+        System.out.println("qdf");
+        qdf.show();
+        Dataset<Row> q = qdf.select(qdf.col("*"),
+                qdf.col("cell_name").substr(5, 2).alias("utchar"),
+                qdf.col("cell_name").substr(7, 1).alias("sector"));
+
+
+        q = q.drop("bts_instance_display_name", "clli_number_bed", "clli_number_hex",
+                "do_rnc", "multi_nids", "nid", "switch_number", "xrtt_enabled", "cell_fro_id", "cid_hex", "lac_hex", "enbid_hex");
+
+
+        q.where(q.col("base_station_name").like("%WIFI%")).write().mode("overwrite").json(Constants.WIFI_NNI_PATH);
+
+
+        q = q.where(functions.not(q.col("base_station_name").like("%WIFI%")));
+
+        UserDefinedFunction ea1sectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
+
+        q.show();
+        //TODO SECTORNO fix with UDF
+        q = q.withColumn("sectorNumber", ea1sectorNumber.apply(q.col("sector")));
+        q.show();
+        q = q.where(functions.not(q.col("cell_status").isin("Erroneous entry", "Removed")));
+        q.show();
+        return q;
+    }
+
+
+    public Dataset addAdditionalAttributes(Dataset q) {
+        return q.withColumn("|telstraCellAttributes|cellFunction", UserDefinedFunctions.eaiCellFunction.apply(q.col("cell_function"))).
+                withColumn("|telstraCellAttributes|hasSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event_cell"))).
+                withColumn("|telstraCellAttributes|hasSignificantSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event"))).
+                withColumn("|telstraCellAttributes|hasPriorityAssistCustomers", UserDefinedFunctions.eaiBool.apply(q.col("priority_assist"))).
+                withColumn("|telstraCellAttributes|hasHighSeasonality", UserDefinedFunctions.eaiBool.apply(q.col("high_seasonality"))).
+                withColumn("|telstraCellAttributes|hasWirelessLocalLoopCustomers", UserDefinedFunctions.eaiBool.apply(q.col("wll"))).
+                withColumn("|telstraCellAttributes|mobileSwitchingCenter", UserDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
+                withColumn("|telstraCellAttributes|mobileServiceArea", q.col("msa")).
+                withColumn("|telstraCellAttributes|quollIndex", UserDefinedFunctions.eaiInt.apply(q.col("cell_index"))).
+                withColumn("|telstraCellAttributes|closedNumberArea", UserDefinedFunctions.eaiAreaCode.apply(q.col("cna")))
+                .select(q.col("*"),
+                        q.col("billing_name").alias("|telstraCellAttributes|billingName"),
+                        q.col("roamer").alias("|telstracellAttributes|iroaningAgreement"),
+                        functions.col("|telstraCellAttributes|cellFunction"),
+                        functions.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("coverage_classification").alias("|telstracellAttributes|coverageClassification"),
+                        functions.regexp_replace(q.col("coverage_statement"), "[\\n\\r]+", " ").alias("|telstraCellAttributes|coverageStatement"),
+                        functions.col("|telstracellAttributes|hasPriorityAssistcustomers"),
+                        functions.col("|telstracellAttributes|haswirelessLocalLoopCustomers"),
+                        q.col("optimisation_cluster").alias("|telstraceilAttributes|optimisationCluster"),
+                        q.col("sac_dec").alias("|telstraceilAttributes|serviceAreacode").cast(IntegerType$.MODULE$),
+                        q.col("owner").alias("|telstraceilAttributes|wirelessServiceOwner"),
+                        functions.col("|telstraCellAttributes|hasSpecialEvent"),
+                        functions.col("|telstracellAttributes|hassignificantSpecialEvent"),
+//                        functions.col("|telstracellattributes|mobileswitchingCentre"),//TODO need to check why this is not there
+                        functions.col("|telstraCellAttributes|mobileServiceArea"),
+                        functions.col("|telstracellAttributes|quolLindex"),
+                        functions.col("|telstraCellAttributes|hasHighSeasonality"));
+    }
+
+
+    public Dataset cleanlyConvertssitesToInteger(Dataset q) {
+        return (q
+                .select(q.col("base_station_name").alias("name"),
+                        q.col("base_station_name").alias("$refId"),
+                        q.col("state").alias("stateProv"),
+                        q.col("nm_address_id").alias("siteId").cast(IntegerType$.MODULE$)//  = # cleanly converts to an integer
+                )
+                .distinct()
+                .withColumn("$type", functions.lit("oci/site"))
+                .withColumn("status", functions.lit("Live"))
+                .withColumn("type", functions.lit("OTHER"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .select("$type", "name", "$refId", "$action", "status", "type", "stateProv", "siteId")    //                      #this is just to re-ord
+        );
+    }
 
     public static Integer genSectorNumber(String sector) {
 
@@ -244,10 +344,9 @@ public class QuollUtils {
         if (paddOne == null) {
             paddOne = false;
         }
-        if(qStr==null){
+        if (qStr == null) {
             return null;
-        }
-        else {
+        } else {
             try {
                 if (paddOne) {
                     String tmp = qStr.split("_")[1];
@@ -266,32 +365,32 @@ public class QuollUtils {
         }
     }
 
-public static Integer  extractIdFromMecontext(String qStr){
-        if(qStr==null){
+    public static Integer extractIdFromMecontext(String qStr) {
+        if (qStr == null) {
             return null;
-        }else{
+        } else {
             try {
-                String[] qStrArr=qStr.split("_");
-               return  Integer.parseInt(qStr.split("_")[qStrArr.length-1]);
-            }catch (Exception e){
-                logger.warn("error extracting ID from mecontext for:"+ qStr);
+                String[] qStrArr = qStr.split("_");
+                return Integer.parseInt(qStr.split("_")[qStrArr.length - 1]);
+            } catch (Exception e) {
+                logger.warn("error extracting ID from mecontext for:" + qStr);
                 return null;
             }
         }
-}
-public static String enmGnbType(String mecontext){
-        if(mecontext==null){
+    }
+
+    public static String enmGnbType(String mecontext) {
+        if (mecontext == null) {
             return null;
         }
-        if(mecontext.indexOf("_BBH_")>=0) {
+        if (mecontext.indexOf("_BBH_") >= 0) {
 //            #return "ocw/gnbcuup"
 //            # ^ is not required as we now are not including the CU objects.
             return "ocw/gnbdu";
         } else {
             return "ocw/gnbdu";
         }
-}
-
+    }
 
 
 }
