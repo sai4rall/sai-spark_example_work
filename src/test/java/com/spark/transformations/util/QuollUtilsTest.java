@@ -14,6 +14,7 @@ class QuollUtilsTest {
     SparkSession session ;
     QuollUtils quollUtils;
     Dataset testDataset;
+    Dataset tespest;
     @BeforeEach
     void setUp() {
         session = SparkSession.builder().appName("QuollTransformationsTest")
@@ -21,7 +22,10 @@ class QuollUtilsTest {
                 .getOrCreate();
         quollUtils = new QuollUtils();
         testDataset = quollUtils.readFile(session, null, "src/test/resources/testoneinput.csv");
-
+        tespest = quollUtils.readFile(session,  QuollSchemas.nodeIdSchema, "src/test/resources/in/TEMPEST.csv");
+        System.out.println("=======================================");
+        tespest.show();
+tespest.where(tespest.col("network").isin("5G (NGRAN)").and(tespest.col("rbs_id").isNotNull())).show();
     }
 
     @AfterEach
@@ -41,7 +45,7 @@ class QuollUtilsTest {
     @Test
     void applyInitialTrabsformaions() {
         Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
-        assertEquals(5, q.count());
+        assertEquals(6, q.count());
 
     }
 
@@ -72,7 +76,7 @@ class QuollUtilsTest {
         Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
         q = quollUtils.addAdditionalAttributes(q);
         Dataset bscdata = quollUtils.transfromBts(q);
-        assertEquals(4, bscdata.count());
+        assertEquals(3, bscdata.count());
     }
     @Test
     void transfromBscToBtsLookup(){
@@ -86,7 +90,71 @@ void transfromBscToBts(){
         Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
         q = quollUtils.addAdditionalAttributes(q);
         Dataset btsLookup = quollUtils.transfromBscToBts(q);
-        assertEquals(4, btsLookup.count());
+        assertEquals(3, btsLookup.count());
+}
+
+    @Test
+    void transformLte() {
+        Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+        q = quollUtils.addAdditionalAttributes(q);
+        Dataset lteDs = quollUtils.transformLte(q);
+        assertEquals(1, lteDs.count());
+    }
+
+    @Test
+    void transformGsm() {// TODO not done
+        Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+        q = quollUtils.addAdditionalAttributes(q);
+        Dataset gsmDs = quollUtils.transformGsm(q);
+        assertEquals(3, gsmDs.count());
+    }
+@Test
+void transformUmts(){
+    Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+    q = quollUtils.addAdditionalAttributes(q);
+    Dataset umtsDs = quollUtils.transformUmts(q);
+    assertEquals(1, umtsDs.count());
+}
+
+    @Test
+    void transformNr(){
+        Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+        q = quollUtils.addAdditionalAttributes(q);
+        Dataset nrDs = quollUtils.transformNr(q);
+        assertEquals(1, nrDs.count());
+    }
+    @Test
+    void transformSiteToRfCellLookUp(){
+        Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+        q = quollUtils.addAdditionalAttributes(q);
+        Dataset sitesToRfCellLookupDs = quollUtils.transformSiteToRfCellLookUp(q);
+        assertEquals(5, sitesToRfCellLookupDs.count());
+    }
+
+    @Test
+    void transformSiteToRfCell(){
+        Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
+        q = quollUtils.addAdditionalAttributes(q);
+        Dataset sitesToRfCellDs = quollUtils.transformSiteToRfCell(q);
+        assertEquals(6, sitesToRfCellDs.count());
+    }
+
+    @Test
+    void transform4GLRAN(){
+        Dataset tempestDataset = quollUtils.transform4GLRAN(tespest);
+        assertEquals(1, tempestDataset.count());
+
+    }
+@Test
+void  transform5GNGRAN() {
+    Dataset transformed5GDataset = quollUtils.transform5GNGRAN(tespest);
+    assertEquals(1, transformed5GDataset.count());
+}
+@Test
+void transform3GWRAN(){
+tespest.show();
+    Dataset transformed5GDataset = quollUtils.transform3GWRAN(tespest);
+    assertEquals(1, transformed5GDataset.count());
 }
     @Test
     void genSectorNumber() {

@@ -51,11 +51,10 @@ public class QuollUtils {
 
         q = q.where(functions.not(q.col("base_station_name").like("%WIFI%")));
 
-        UserDefinedFunction ea1sectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
+//        UserDefinedFunction ea1sectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
 
         q.show();
-        //TODO SECTORNO fix with UDF
-        q = q.withColumn("sectorNumber", ea1sectorNumber.apply(q.col("sector")));
+        q = q.withColumn("sectorNumber", UserDefinedFunctions.eaisectorNumber.apply(q.col("sector")));
         q.show();
         q = q.where(functions.not(q.col("cell_status").isin("Erroneous entry", "Removed")));
         q.show();
@@ -70,25 +69,25 @@ public class QuollUtils {
                 withColumn("|telstraCellAttributes|hasPriorityAssistCustomers", UserDefinedFunctions.eaiBool.apply(q.col("priority_assist"))).
                 withColumn("|telstraCellAttributes|hasHighSeasonality", UserDefinedFunctions.eaiBool.apply(q.col("high_seasonality"))).
                 withColumn("|telstraCellAttributes|hasWirelessLocalLoopCustomers", UserDefinedFunctions.eaiBool.apply(q.col("wll"))).
-                withColumn("|telstraCellAttributes|mobileSwitchingCenter", UserDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
+                withColumn("|telstraCellAttributes|mobileSwitchingCentre", UserDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
                 withColumn("|telstraCellAttributes|mobileServiceArea", q.col("msa")).
                 withColumn("|telstraCellAttributes|quollIndex", UserDefinedFunctions.eaiInt.apply(q.col("cell_index"))).
                 withColumn("|telstraCellAttributes|closedNumberArea", UserDefinedFunctions.eaiAreaCode.apply(q.col("cna")))
                 .select(q.col("*"),
                         q.col("billing_name").alias("|telstraCellAttributes|billingName"),
-                        q.col("roamer").alias("|telstracellAttributes|iroaningAgreement"),
+                        q.col("roamer").alias("|telstracellAttributes|roamingAgreement"),
                         functions.col("|telstraCellAttributes|cellFunction"),
                         functions.col("|telstraCellAttributes|closedNumberArea"),
                         q.col("coverage_classification").alias("|telstracellAttributes|coverageClassification"),
                         functions.regexp_replace(q.col("coverage_statement"), "[\\n\\r]+", " ").alias("|telstraCellAttributes|coverageStatement"),
                         functions.col("|telstracellAttributes|hasPriorityAssistcustomers"),
                         functions.col("|telstracellAttributes|haswirelessLocalLoopCustomers"),
-                        q.col("optimisation_cluster").alias("|telstraceilAttributes|optimisationCluster"),
-                        q.col("sac_dec").alias("|telstraceilAttributes|serviceAreacode").cast(IntegerType$.MODULE$),
-                        q.col("owner").alias("|telstraceilAttributes|wirelessServiceOwner"),
+                        q.col("optimisation_cluster").alias("|telstracellAttributes|optimisationCluster"),
+                        q.col("sac_dec").alias("|telstracellAttributes|serviceAreacode").cast(IntegerType$.MODULE$),
+                        q.col("owner").alias("|telstracellAttributes|wirelessServiceOwner"),
                         functions.col("|telstraCellAttributes|hasSpecialEvent"),
                         functions.col("|telstracellAttributes|hassignificantSpecialEvent"),
-//                        functions.col("|telstracellattributes|mobileswitchingCentre"),//TODO need to check why this is not there
+                        functions.col("|telstracellattributes|mobileSwitchingCentre"),
                         functions.col("|telstraCellAttributes|mobileServiceArea"),
                         functions.col("|telstracellAttributes|quolLindex"),
                         functions.col("|telstraCellAttributes|hasHighSeasonality"));
@@ -450,4 +449,331 @@ public class QuollUtils {
     }
 
 
+    public Dataset transformLte(Dataset q) {
+        return (q.where((q.col("technology").like("LTE%")).and(q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", functions.lit("ocw/lteCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status"))) // ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //ocw:telstraCellTypePicklist
+                .withColumn("|telstraLteCellAttributes|trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))
+//                # To keep here as per NNI-1336 and NNI-1622
+                .withColumn("qualifiedCellId", functions.expr("conv(eci, 16, 10)"))
+//                 # Convert eci from hex to decimal
+                .select(functions.col("$type"),
+                        q.col("cell_name").alias("$refId"),
+                        functions.col("$action"),
+                     q.col("cell_name").alias("name"),
+                        functions.col("status"),
+                        functions.concat(functions.substring(q.col("technology"), 4, 99),
+                                functions.lit("MHz")).alias("band'"),
+                        functions.col("qualifiedCellId"),
+                        functions.col("cellType"), q.col("sectorNumber"),
+                           q.col("cid_dec").alias("cellId").cast(IntegerType$.MODULE$),
+//
+//                # cleanly converts to an integer. However need to validate as per NNI-1630
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"),
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+//                # Dynamic Attributes
+                        q.col("|telstraCellAttributes|billingName"),
+                        q.col("|telstraCellAttributes|roamingAgreement"),
+                        q.col("|telstraCellAttributes|cellFunction"),
+                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("|telstraCellAttributes|coverageClassification"),
+                        q.col("|telstraCellAttributes|coverageStatement"),
+                        q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                        q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                        q.col("|telstraCellAttributes|optimisationCluster"),
+                        q.col("|telstraCellAttributes|serviceAreaCode"),
+                        q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                        q.col("|telstraCellAttributes|hasSpecialEvent"),
+                        q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                        q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                        q.col("|telstraCellAttributes|mobileServiceArea"),
+                        q.col("|telstraCellAttributes|quollIndex"),
+                        q.col("|telstraCellAttributes|hasHighSeasonality"),
+                        functions.col("|telstraLteCellAttributes|trackingAreaCode")//,
+//                        q.col("plmn").alias("|telstraLteCellAttributes"),//TODO need to check next 3 lines
+//                        q.col("|plmn").cast(IntegerType$.MODULE$),
+//                        q.col("cgi").alias("|telstraLteCellAttributes|ecgi") // # To be changed to calculated field as per NNI-1627
+                )
+        );
+    }
+    public Dataset transformGsm(Dataset q){
+        return   (q.where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", functions.lit("ocw/gsmCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))// # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //# ocw:telstraCellTypePicklist
+//                .withColumn("lac", eaiLac(functions.col("lac_dec")))
+                .withColumn("egprsActivated", UserDefinedFunctions.eaiYN.apply(functions.col("edge")))// # values are Yes/No
+                .withColumn("|telstraGsmCellAttributes|evdoEnabled", UserDefinedFunctions.eaiBool.apply(functions.col("evdo")))
+                .withColumn("gprsActivated", UserDefinedFunctions.eaiYN.apply(functions.col("gprs"))) //# values are Yes/No
+                .withColumn("rac", UserDefinedFunctions.eaiInt.apply(functions.col("rac_dec")))
+                .withColumn("|telstraGsmCellAttributes|broadcastCode", UserDefinedFunctions.eaiInt.apply(functions.col("code_for_cell_broadcast")))
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
+                        functions.col("$action"), q.col("cell_name").alias("name"),
+                        functions.col("status"),
+                        functions.concat(functions.substring(q.col("technology"), 4, 99),
+                                functions.lit(" MHz")).alias("band"),
+                        functions.col("cellType"), q.col("sectorNumber"), //q.col("lac_dec.alias("lac").cast(IntegerType()), # cleanly converts to an integer.
+//                        functions.col("lac"),//TODO fix this
+                        q.col("cgi"),
+                        functions.col("egprsActivated"),
+                        functions.col("gprsActivated"),
+                        functions.col("rac"),
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"), // Dynamic Attributes
+                        q.col("|telstraCellAttributes|billingName"),
+                        q.col("|telstraCellAttributes|roamingAgreement"),
+                        q.col("|telstraCellAttributes|cellFunction"),
+                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("|telstraCellAttributes|coverageClassification"),
+                        q.col("|telstraCellAttributes|coverageStatement"),
+                        q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                        q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                        q.col("|telstraCellAttributes|optimisationCluster"),
+                        q.col("|telstraCellAttributes|serviceAreaCode"),
+                        q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                        q.col("|telstraCellAttributes|hasSpecialEvent"),
+                        q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                        q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                        q.col("|telstraCellAttributes|mobileServiceArea"),
+                        q.col("|telstraCellAttributes|quollIndex"),
+                        q.col("|telstraCellAttributes|hasHighSeasonality"),
+                        functions.col("|telstraGsmCellAttributes|broadcastCode"),
+                        q.col("plmn").alias("|telstraGsmCellAttributes|plmn").cast(IntegerType$.MODULE$),
+                        functions.col("|telstraGsmCellAttributes|evdoEnabled"),
+                        q.col("gsm03_38_coding").alias("|telstraGsmCellAttributes|gsm338Coding")));
+    }
+
+    public Dataset transformUmts(Dataset q) {
+       return (q.where((q.col("technology").like("WCDMA%")).and(q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", functions.lit("ocw/umtsCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                        //       # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                     //# ocw:telstraCellTypePicklist
+//                 .withColumn("lac", eaiLac(functions.col("lac_dec")))
+                .withColumn("rac", UserDefinedFunctions.eaiRac.apply(functions.col("rac_dec")))
+                .withColumn("ura", UserDefinedFunctions.eaiUra.apply(functions.col("ura")))
+                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                              //  # Convert string to int via udf
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
+                        functions.col("$action"), q.col("cell_name").alias("name"), functions.col("status"),
+                        functions.concat(functions.substring(q.col("technology"), 6, 99),
+                                functions.lit(" MHz")).alias("band"),
+                        functions.col("cellType"),
+                        q.col("cgi"),
+//                        functions.col("lac"),//TODO fix this
+//                        #q.lac_dec.alias('lac').cast(IntegerType()),                       # cleanly converts to an integer.
+                        functions.col("rac"),
+                        functions.col("ura"),
+                        q.col("cid_dec").alias("cellId").cast(IntegerType$.MODULE$),                  //  # cleanly converts to an integer.
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"),
+
+//        # Dynamic Attributes:
+                        q.col("|telstraCellAttributes|billingName"),
+                        q.col("|telstraCellAttributes|roamingAgreement"),
+                        q.col("|telstraCellAttributes|cellFunction"),
+                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("|telstraCellAttributes|coverageClassification"),
+                        q.col("|telstraCellAttributes|coverageStatement"),
+                        q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                        q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                        q.col("|telstraCellAttributes|optimisationCluster"),
+                        q.col("|telstraCellAttributes|serviceAreaCode"),
+                        q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                        q.col("|telstraCellAttributes|hasSpecialEvent"),
+                        q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                        q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                        q.col("|telstraCellAttributes|mobileServiceArea"),
+                        q.col("|telstraCellAttributes|quollIndex"),
+                        q.col("|telstraCellAttributes|hasHighSeasonality"),
+
+                        q.col("ro").alias("|telstraUmtsCellAttributes|routingOrigin").cast(IntegerType$.MODULE$),               //   # cleanly converts to an integer.
+                        q.col("plmn").alias("|telstraUmtsCellAttributes|plmn").cast(IntegerType$.MODULE$)
+                        //  #q.hs_support.alias('|Telstra UMTS Cell Attributes|HS Supported')                      # Deprecated
+                ));
+    }
+
+    public Dataset transformNr(Dataset q) {
+        return (q.where((q.col("technology").like("NR%")).and(q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", functions.lit("ocw/nrCell"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                            //   # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                 //    # ocw:telstraCellTypePicklist
+                .withColumn("bsChannelBandwidthDownlink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("bsChannelBandwidthUplink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("localCellIdNci", functions.expr("conv(eci, 16, 10)"))                        //  # Convert eci from hex to decimal
+                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                             //   # Convert string to int via udf
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"), functions.col("$action"), q.col("cell_name").alias("name"), functions.col("status"),
+                        functions.col("bsChannelBandwidthDownlink"), functions.col("bsChannelBandwidthUplink"),
+                        functions.col("cellType"), functions.col("localCellIdNci"), functions.col("trackingAreaCode"),
+                        functions.regexp_replace(q.col("note"), "[\\n\\r]+", " ").alias("comments"),
+                        q.col("cell_inservice_date").alias("originalOnAirDate"),
+
+//                        # Dynamic Attributes:
+                        q.col("|telstraCellAttributes|billingName"),
+                        q.col("|telstraCellAttributes|roamingAgreement"),
+                        q.col("|telstraCellAttributes|cellFunction"),
+                        q.col("|telstraCellAttributes|closedNumberArea"),
+                        q.col("|telstraCellAttributes|coverageClassification"),
+                        q.col("|telstraCellAttributes|coverageStatement"),
+                        q.col("|telstraCellAttributes|hasPriorityAssistCustomers"),
+                        q.col("|telstraCellAttributes|hasWirelessLocalLoopCustomers"),
+                        q.col("|telstraCellAttributes|optimisationCluster"),
+                        q.col("|telstraCellAttributes|serviceAreaCode"),
+                        q.col("|telstraCellAttributes|wirelessServiceOwner"),
+                        q.col("|telstraCellAttributes|hasSpecialEvent"),
+                        q.col("|telstraCellAttributes|hasSignificantSpecialEvent"),
+                        q.col("|telstraCellAttributes|mobileSwitchingCentre"),
+                        q.col("|telstraCellAttributes|mobileServiceArea"),
+                        q.col("|telstraCellAttributes|quollIndex"),
+                        q.col("|telstraCellAttributes|hasHighSeasonality"),
+                        q.col("cgi").alias("|telstraNrCellAttributes|ncgi")
+                )
+        );
+    }
+
+    public Dataset transformSiteToRfCellLookUp(Dataset q) {
+        return (q.where((q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", functions.lit("oci/site"))
+                .withColumn("$action", functions.lit("LOOKUP"))
+
+                .select(functions.col("$type"), functions.col("$action"),
+                        q.col("base_station_name").alias("$refId"),
+                        q.col("base_station_name").alias("name")
+                )
+                .distinct()
+        );
+
+    }
+
+    public Dataset transformSiteToRfCell(Dataset q) {
+        return (q.where((q.col("rru_donor_node").isin("remote", "neither")))
+                .withColumn("$type", UserDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$site", functions.array(functions.col("base_station_name")))
+                .select(functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
+                        functions.col("$site"), q.col("cell_name").alias("name")
+                )
+        );
+    }
+
+    public Dataset transform4GLRAN(Dataset t) {
+        return (t.where(t.col("network").isin("4G (LRAN)").and(t.col("rbs_id").isNotNull()))
+                .withColumn("name", UserDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("rbs_id"), functions.col("node_code")))
+                .withColumn("type", functions.lit("ocw/eNodeB"))
+                .select(functions.col("name"), functions.col("type"), t.col("node_code"),
+                        t.col("rbs_id").alias("id"), t.col("virtual_rnc"), //  # t.site_name,
+                        t.col("status")
+//                        #t.address_id,
+//                        #t.nodeb_allocation_id.alias("tempestId")#    , t.du_number
+                )
+//        # .where("myDu is null")
+//        # .where(t.node_code == "AADP')
+//        # .show(200, truncate = False)
+//        # .printSchema()
+        );
+    }
+
+    public Dataset transform5GNGRAN(Dataset t) {
+        return (t.where(t.col("network").isin("5G (NGRAN)").and(t.col("gnb_id").isNotNull()))
+                .withColumn("name", UserDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("gnb_id"), functions.col("node_code")))
+                .withColumn("type", functions.lit("ocw/gnbdu"))
+                .select(functions.col("name"), functions.col("type"), t.col("node_code"),
+                        t.col("gnb_id").alias("id"), t.col("virtual_rnc"),  // # t.site_name,
+                        t.col("status")
+//                        #t.address_id,
+//                        #t.nodeb_allocation_id.alias("tempestId")#    , t.du_number
+                )
+        );
+    }
+
+    public Dataset transform3GWRAN(Dataset t) {
+        (t.where(t.col("network").isin("3G (WRAN)").and(t.col("rbs_id").isNotNull()))).show();
+        return  (t.where(t.col("network").isin("3G (WRAN)").and(t.col("rbs_id").isNotNull()))
+                .withColumn("name", UserDefinedFunctions.eaiNodeBName.apply(functions.col("site_name"), functions.col("node_code")))
+                .withColumn("type", functions.lit("ocw/nodeB"))
+                .select(functions.col("name"), functions.col("type"), t.col("node_code"),
+                        t.col("rbs_id").alias("id"), t.col("virtual_rnc"),// #  t.site_name,
+                        t.col("status")
+//                        #t.address_id,
+//                        #t.nodeb_allocation_id.alias('tempestId')#    , t.du_number
+                )
+        );
+    }
+
+    public Dataset transformnbe(Dataset nb_e) {
+        return (nb_e
+                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .withColumn("id", UserDefinedFunctions.eaiIdFromMecontext.apply(functions.col("mecontext")))
+                .withColumn("type", functions.lit("ocw/nodeB"))
+                .withColumn("status", functions.lit("In Service"))
+                .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
+                        functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
+                .where(functions.col("id").isNotNull())
+        );
+    }
+
+    public Dataset transformenbE(Dataset enb_e) {
+        return (enb_e
+                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .withColumn("type", functions.lit("ocw/eNodeB"))
+                .withColumn("status", functions.lit("In Service"))
+                .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
+                        functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
+                .where(functions.col("id").isNotNull())
+        );
+    }
+
+    public Dataset transformGnbdE(Dataset gnbd_e) {
+        return  (gnbd_e
+                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .select(functions.col("name"), functions.col("id"), gnbd_e.col("mecontext"))
+                .where(functions.col("id").isNotNull()));
+    }
+
+    public Dataset transformGnbE(Dataset gnb_e) {
+       return  (gnb_e
+                .withColumn("type", UserDefinedFunctions.eaiEnmGnbType.apply(functions.col("mecontext")))
+                .withColumn("status", functions.lit("In Service"))
+                .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
+                        functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
+        );
+    }
+
+    public Dataset transformBtsToGsmCell(Dataset q) {
+        return  (q
+                .where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
+//    #.withColumn('btsId', eaiInt(F.col('iub_rbsid')))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$type", functions.lit("ocw/gsmCell"))
+                .withColumn("$bts", functions.array(functions.col("btsName")))
+                .select(functions.col("$type"), q.col("cell_name").alias("$refId"), functions.col("$action"),
+                        q.col("cell_name").alias("name"), functions.col("$bts"))
+        );
+    }
+
+    public Dataset transformBtsToGsmCelLoopUP(Dataset bts) {
+       return  (bts
+                .select("$type", "$refId", "name")
+                .withColumn("$action", functions.lit("lookup"))
+                .select("$type", "$refId", "$action", "name")
+                .distinct()
+        );
+    }
+
+    public Dataset transformMbs(Dataset mbs) {
+        return (mbs
+                .select(mbs.col("id"), mbs.col("name"), mbs.col("type"), mbs.col("status").alias("tmp"), mbs.col("nodeCode"))
+                .withColumn("status", UserDefinedFunctions.eaiStatus.apply(functions.col("tmp")))
+                .withColumn("$refId", functions.col("name"))
+                .withColumn("$type", functions.col("type"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id"), mbs.col("name"), mbs.col("type"), functions.col("status")
+                        , mbs.col("nodeCode"))
+        );
+    }
 }

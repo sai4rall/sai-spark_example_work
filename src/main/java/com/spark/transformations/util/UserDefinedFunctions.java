@@ -8,7 +8,7 @@ import org.apache.spark.sql.types.IntegerType$;
 public class UserDefinedFunctions {
     public static UserDefinedFunction eaisectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
     public static UserDefinedFunction eaiCellStatus = functions.udf((String s) -> QuollUtils.napCellStatus(s), DataTypes.StringType);
-    public static UserDefinedFunction ealStatus = functions.udf((String s) -> QuollUtils.mapStatus(s), DataTypes.StringType);
+    public static UserDefinedFunction eaiStatus = functions.udf((String s) -> QuollUtils.mapStatus(s), DataTypes.StringType);
     public static UserDefinedFunction eaiCellType = functions.udf((String s) -> QuollUtils.mapCellType(s), DataTypes.StringType);
     public static UserDefinedFunction eaiCellFunction = functions.udf((String s) -> QuollUtils.mapCellFunction(s), DataTypes.StringType);
     public static UserDefinedFunction eaiRac = functions.udf((String s) -> QuollUtils.cleanRac(s), DataTypes.IntegerType);
