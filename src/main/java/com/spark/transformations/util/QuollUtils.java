@@ -327,7 +327,7 @@ public class QuollUtils {
                 return "ocw/lteCell";
             else if (sTech.indexOf("WCDMA") > -1)
                 return "Ocw/umtsCell";
-            else if (sTech.indexOf("GSH") > -1)
+            else if (sTech.indexOf("GSM") > -1)
                 return "ocw/gsmCell";
             else
                 return null;
@@ -416,6 +416,7 @@ public class QuollUtils {
                 }
 
             } catch (Exception e) {
+                e.printStackTrace();
                 return null;
             }
         }
@@ -744,7 +745,7 @@ public class QuollUtils {
 
     public Dataset transformBtsToGsmCell(Dataset q) {
         return  (q
-                .where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin(Arrays.asList("remote", "neither"))))
+                .where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin("remote", "neither")))
                 .select(q.col("cell_name"), q.col("cell_name").substr(1, 4).alias("btsName"))
 //    #.withColumn('btsId', eaiInt(F.col('iub_rbsid')))
                 .withColumn("$action", functions.lit("createOrUpdate"))
