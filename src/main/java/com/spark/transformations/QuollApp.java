@@ -172,10 +172,13 @@ public class QuollApp {
                 bs.col("status").alias("bsstatus"), bs.col("node_code").alias("bsnodeCode"));
 
 //       # For all of the id's that match ENM and SB, keep the ENM version
-        Dataset tmp1 = enm.join(b3, functions.col("id"), "left_outer").select("id", "name", "type", "status", "nodeCode");   //  #for this join get the ENM side
+        Dataset tmp1 = enm.join(b3, enm.col("id").equalTo(b3.col("id")), "left_outer")
+                .select(b3.col("id"), enm.col("name"), enm.col("type"), enm.col("status"), enm.col("nodeCode"));   //  #for this join get the ENM side
 
 //# get the remaining records that are in BS but not in ENM
-        Dataset tmp3 = bs.join(enm, functions.col("id"), "left_anti").select(functions.col("id"), functions.col("name"), functions.col("type"), functions.col("status"), bs.col("node_code").alias("nodeCode"));
+        Dataset tmp3 = bs.join(enm, bs.col("id").equalTo(enm.col("id")), "left_anti")
+                .select(bs.col("id"), bs.col("name"), bs.col("type"), bs.col("status"),
+                        bs.col("node_code").alias("nodeCode"));
 
         Dataset mbs = tmp1.union(tmp3);
 
@@ -183,8 +186,8 @@ public class QuollApp {
 
 //# convert all the statuses from Tempest, BBH XLSX and ENM into valid ENM statuses values
 //# TPD-1275 and TPD-1328
-        mbs = quollUtils.transformMbs(mbs);
 
+        mbs = quollUtils.transformMbs(mbs);
 
 //# bs gives a consolidated list of base stations from TEMPEST and BBH XLSX
 //#   we now need to split these up again so that we can add in type specific fields
@@ -205,6 +208,7 @@ public class QuollApp {
 //#print(eNodeB.count())      # 25490
 //#print(gNBDU.count())       # 1063
 //#print(gNBCUUP.count())     # 3162
+        nodeB.show();
         nodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nodeB");
         eNodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "eNodeB");
         gNBDU.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "gNB-DU");
