@@ -69,8 +69,8 @@ class QuollUtilsTest {
     public void transformRnc(){
         Dataset q = quollUtils.applyInitialTrabsformaions(testDataset);
         q = quollUtils.addAdditionalAttributes(q);
-        Dataset bscdata = quollUtils.transformBsc(q);
-        assertEquals(1, bscdata.count());
+        Dataset racData = quollUtils.transformRnc(q);
+        assertEquals(1, racData.count());
     }
     @Test
     void transfromBts(){
@@ -200,7 +200,10 @@ void transformBtsToGsmCelLoopUP(){
 }
 @Test
 public void transformMbs() {
-
+    Dataset mbsTest = quollUtils.readFile(session,null,"src/test/resources/in/mbsTestData.csv");
+    mbsTest.show();
+    Dataset mbs = quollUtils.transformMbs(mbsTest);
+    assertEquals(3, mbs.count());
     }
 @Test
 void transform3GWRAN(){
@@ -252,6 +255,7 @@ tespest.show();
     @Test
     void cleanRac() {
         assertEquals(1,quollUtils.cleanRac("1"));
+        assertEquals(null,quollUtils.cleanRac("a1"));
 
     }
 
@@ -310,17 +314,18 @@ tespest.show();
     @Test
     void cleanUra() {
         assertEquals(2,quollUtils.cleanUra("2:45"));
+        assertEquals(null,quollUtils.cleanUra(null));
+        assertEquals(null,quollUtils.cleanUra("a:b"));
 
     }
 
-    @Test
-    void classTag() {
-    }
+
 
     @Test
     void isInteger() {
         assertTrue(quollUtils.isInteger("2"));
         assertFalse(quollUtils.isInteger("2a"));
+        assertFalse(quollUtils.isInteger(null));
 
     }
 
@@ -394,6 +399,25 @@ tespest.show();
         assertEquals("NODECODEtESTZ",quollUtils.genNodeBName("(33)", "NODECODEtEST"));
         assertEquals("NODECODEtEST1",quollUtils.genNodeBName("TEST", "NODECODEtEST"));
 
-
     }
+
+    @Test
+    void  transformBsToB3(){
+        Dataset bs = quollUtils.readFile(session, null, "src/test/resources/in/bstestData.csv");
+        assertEquals(3,quollUtils.transformBsToB3(bs).count());
+    }
+    @Test
+    void  transformenmToMbs() {
+        Dataset bs = quollUtils.readFile(session, null, "src/test/resources/in/bstestData.csv");
+        Dataset enm = quollUtils.readFile(session, null, "src/test/resources/enmTestData.csv");
+        Dataset b3 = quollUtils.transformBsToB3(bs);
+        assertEquals(3, quollUtils.transformenmToMbs(enm, b3, bs).count());
+    }
+    @Test
+    void joinBsAndn(){
+        Dataset b2 = quollUtils.readFile(session, null, "src/test/resources/in/b2testData.csv");
+        Dataset n = quollUtils.readFile(session, null, "src/test/resources/in/mbsTestData.csv");
+        assertEquals(3,quollUtils.joinBsAndn(b2, n).count());
+    }
+
 }

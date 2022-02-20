@@ -1,0 +1,4 @@
+id,name,type,status,node_code,virtual_rnc
+1,abc,tpe,Commissioning,nodeCd,v
+1,abc,tpe,sCommissioningts,nodeCd,v1
+1,abc,tpe,Commissioning,nodeCd,v3

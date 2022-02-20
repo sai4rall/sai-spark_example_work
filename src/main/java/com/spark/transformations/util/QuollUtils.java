@@ -314,8 +314,6 @@ public class QuollUtils {
             Integer.parseInt(s);
         } catch (NumberFormatException e) {
             return false;
-        } catch (NullPointerException e) {
-            return false;
         }
         // only got here if we didn't return false
         return true;
@@ -828,5 +826,34 @@ public class QuollUtils {
                         mbs.col("id"), mbs.col("name"), mbs.col("type"), functions.col("status")
                         , mbs.col("nodeCode"))
         );
+    }
+
+    public Dataset transformBsToB3(Dataset bs) {
+        return bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
+                bs.col("status").alias("bsstatus"), bs.col("node_code").alias("bsnodeCode"));
+    }
+
+    public Dataset transformenmToMbs(Dataset enm,Dataset b3,Dataset bs) {
+
+//       # For all of the id's that match ENM and SB, keep the ENM version
+        Dataset tmp1 = enm.join(b3, enm.col("id").equalTo(b3.col("id")), "left_outer")
+                .select(b3.col("id"), enm.col("name"), enm.col("type"), enm.col("status"), enm.col("nodeCode"));   //  #for this join get the ENM side
+
+//# get the remaining records that are in BS but not in ENM
+        Dataset tmp3 = bs.join(enm, bs.col("id").equalTo(enm.col("id")), "left_anti")
+                .select(bs.col("id"), bs.col("name"), bs.col("type"), bs.col("status"),
+                        bs.col("node_code").alias("nodeCode"));
+        return tmp1.union(tmp3);
+    }
+
+    public Dataset joinBsAndn(Dataset b2, Dataset n) {
+      return   (b2
+                .join(n, (b2.col("name").equalTo(n.col("name"))), "inner")
+                .select(b2.col("name"), b2.col("type"), b2.col("node_code"), b2.col("id"), b2.col("virtual_rnc"),
+                        b2.col("status"))   //   # select the bbh side
+                .union(b2.join(n, b2.col("name").equalTo(n.col("name")), "left_anti"))
+                .union(n.join(b2, n.col("name").equalTo(b2.col("name")), "left_anti"))     //  # psudo right_anti
+                .where(functions.col("name").isNotNull())
+                .distinct());
     }
 }

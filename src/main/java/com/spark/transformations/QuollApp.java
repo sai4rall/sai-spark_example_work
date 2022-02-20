@@ -128,14 +128,8 @@ public class QuollApp {
                 .select(b.col("name"), functions.col("type"), b.col("node_code"), b.col("id"), b.col("virtual_rnc"), functions.col("status"))
         );
 
-        Dataset bs = (b2
-                .join(n, (b2.col("name").equalTo(n.col("name"))), "inner")
-                .select(b2.col("name"), b2.col("type"), b2.col("node_code"), b2.col("id"), b2.col("virtual_rnc"),
-                        b2.col("status"))   //   # select the bbh side
-                .union(b2.join(n, b2.col("name").equalTo(n.col("name")), "left_anti"))
-                .union(n.join(b2, n.col("name").equalTo(b2.col("name")), "left_anti"))     //  # psudo right_anti
-                .where(functions.col("name").isNotNull())
-                .distinct());
+        Dataset bs = quollUtils.joinBsAndn(b2,n);
+
 //# n.count = 42749
 //# b.count = 5698
 //#n.count()
@@ -168,19 +162,9 @@ public class QuollApp {
         enm = enm.union(enb_e);
         enm = enm.union(gnb_e);
 //        #enm = enm.union(bts.select(bts.name, bts.btsId.alias('id'), bts.type, bts.status, bts.name.alias('nodeCode')))
-        Dataset b3 = bs.select(bs.col("name").alias("bsname"), bs.col("id"), bs.col("type").alias("bstype"),
-                bs.col("status").alias("bsstatus"), bs.col("node_code").alias("bsnodeCode"));
+        Dataset b3 = quollUtils.transformBsToB3(bs);
 
-//       # For all of the id's that match ENM and SB, keep the ENM version
-        Dataset tmp1 = enm.join(b3, enm.col("id").equalTo(b3.col("id")), "left_outer")
-                .select(b3.col("id"), enm.col("name"), enm.col("type"), enm.col("status"), enm.col("nodeCode"));   //  #for this join get the ENM side
-
-//# get the remaining records that are in BS but not in ENM
-        Dataset tmp3 = bs.join(enm, bs.col("id").equalTo(enm.col("id")), "left_anti")
-                .select(bs.col("id"), bs.col("name"), bs.col("type"), bs.col("status"),
-                        bs.col("node_code").alias("nodeCode"));
-
-        Dataset mbs = tmp1.union(tmp3);
+        Dataset mbs =quollUtils.transformenmToMbs(enm,b3,bs);
 
 //#mbs.orderBy(mbs.name).show()
 
