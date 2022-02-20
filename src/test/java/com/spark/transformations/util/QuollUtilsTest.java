@@ -353,16 +353,7 @@ tespest.show();
 
     }
 
-    @Test
-    void genEGNodeBName() {
-       // assertEquals(26000,quollUtils.genEGNodeBName("NR26G"));
 
-    }
-
-    @Test
-    void genNodeBName() {
-//        assertEquals(26000,quollUtils.genNodeBName("NR26G"));
-    }
 
     @Test
     void extractNameFromMecontext() {
@@ -387,6 +378,22 @@ tespest.show();
         assertEquals("ocw/gnbdu", quollUtils.enmGnbType("TEST_BBH_testvak"));
         assertEquals("ocw/gnbdu", quollUtils.enmGnbType("TESTtestvak"));
         assertEquals(null, quollUtils.enmGnbType(null));
+
+    }
+    @Test
+    void genEGNodeBName(){
+
+        assertEquals("NODECODEtESTdutest",quollUtils.genEGNodeBName("dutest", "(LTE3)", 50000, "NODECODEtEST"));
+        assertEquals("NODECODEtEST30",quollUtils.genEGNodeBName(null, "(LTE3)", 50000, "NODECODEtEST"));
+        assertEquals("NODECODEtESTZ0",quollUtils.genEGNodeBName(null, "(LTE33)", 50000, "NODECODEtEST"));
+        assertEquals("NODECODEtEST10",quollUtils.genEGNodeBName(null, "(WCDMA3G)", 50000, "NODECODEtEST"));
+    }
+    @Test
+    void  genNodeBName(){
+        assertEquals("NODECODEtEST3",quollUtils.genNodeBName("(3)", "NODECODEtEST"));
+        assertEquals("NODECODEtESTZ",quollUtils.genNodeBName("(33)", "NODECODEtEST"));
+        assertEquals("NODECODEtEST1",quollUtils.genNodeBName("TEST", "NODECODEtEST"));
+
 
     }
 }

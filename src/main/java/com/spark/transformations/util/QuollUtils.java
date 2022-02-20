@@ -3,6 +3,7 @@ package com.spark.transformations.util;
 import com.spark.transformations.config.Constants;
 import com.spark.transformations.config.QuollMapConstants;
 import com.spark.transformations.config.QuollSchemas;
+import org.apache.hadoop.shaded.com.google.common.base.CharMatcher;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -16,6 +17,7 @@ import scala.reflect.ClassTag;
 
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class QuollUtils {
@@ -366,35 +368,85 @@ public class QuollUtils {
             }
         }
     }
-//TODO need to verify datatypes of parameters
-
-    public static String genEGNodeBName(Integer du, String site, String nid, String nodeCode) {
+    public static String genEGNodeBName(String du, String site, Integer nid, String nodeCode) {
+        /*
+        UDF for building the DU if there is no exsting du field.
+         */
         if (du == null) {
-            //  Pattern lte1DigitPattern = Pattern.compile("\\(LTE[1-9]\\");//. represents single character
-            //   boolean m1d = lte1DigitPattern.matcher(site).matches();
-//TODO- DISCUSS LOGIC
+            try {
+                String incChar = "";
+                Pattern lte1DigitPattern = Pattern.compile("\\(LTE[1-9]\\)");
+                Matcher m1d = lte1DigitPattern.matcher(site);
+                Pattern lte2DigitPattern = Pattern.compile("\\(LTE[1-9][0-9]\\)");
+                Matcher m2d = lte2DigitPattern.matcher(site);
+// # check for 2 digit increment numbers and convert them to letters
+                if (m2d.find()){
+                    site = site.substring(m2d.start());
+                    incChar = ""+site.replaceAll("[^0-9]", "");
+                    incChar = QuollMapConstants.ranNumberingDict.get(incChar);   //# convert to a character
+                }else if(m1d.find()){
+                    site = site.substring(m1d.start());
+                    incChar = ""+site.replaceAll("[^0-9]", "");
+                }else{
+//                    # search for single digit increment numbers.
+//                # extract out the section within the (), assuming it is at the end of the site string
+                    site = site.substring(site.indexOf('('));
+//                   # replace '1-x' with just 1.  This seems to be the case for all instances that have a du_number populated.
+                    site = site.replace("1-2", "1");
+                    site = site.replace("1-3", "1");
+                    site = site.replace("1-4", "1");
+//                     # first remove '3G', '4G', '5G'
+                    site = site.replace("3G", "");
+                    site = site.replace("4G", "");
+                    site = site.replace("5G", "");
+//                     # Extract out the reamining digits
+                    incChar = ""+site.replaceAll("[^0-9]", "");
 
-            //   Pattern lte2DigitPattern = Pattern.compile("\\(LTE[1-9][0-9]\\"));
-            //   boolean m2d = lte1DigitPattern.matcher(site).matches();
-            return null;// temp
+                }
+                if (incChar.length() == 1){
+                    int id=nid / 100000;
+                    return nodeCode + incChar + id;
+                }
+                else if(incChar.length() == 0) {
+                    // if no number found assume '1'
+                    int id=nid / 100000;
+                    return nodeCode + "1" +id;
+                }else {
+                    return null;
+                }
 
-        } else {
-            //TODO- DISCUSS LOGIC
-            return nodeCode + String.valueOf(du);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
         }
-
-
+        return nodeCode + String.valueOf(du);
     }
 
 
     public static String genNodeBName(String site, String nodeCode) {
         try {
-            // TODO need to discuss logic
-            return null;
+            Pattern pattern = Pattern.compile("\\([1-9]\\)");
+            Matcher m = pattern.matcher(site);
+            if(m.find()){
+                site = site.substring(m.start());
+                String incChar = ""+site.replaceAll("[^0-9]", "");
+                return nodeCode + incChar;
+            }
+            pattern = Pattern.compile("\\([1-9][0-9]\\)");
+            m = pattern.matcher(site);
+            if(m.find()){
+                site = site.substring(m.start());
+                String incChar = ""+site.replaceAll("[^0-9]", "");
+                return nodeCode + QuollMapConstants.ranNumberingDict.get(incChar);
+            }
+
+            return nodeCode + "1";
         } catch (Exception e) {
             return null;
         }
     }
+
 
     public static String extractNameFromMecontext(String qStr, Boolean paddOne) {
         if (paddOne == null) {
