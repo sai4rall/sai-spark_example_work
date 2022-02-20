@@ -200,8 +200,7 @@ void transformBtsToGsmCelLoopUP(){
 }
 @Test
 public void transformMbs() {
-    Dataset mbsTest = quollUtils.readFile(session,null,"src/test/resources/in/mbsTestData.csv");
-    mbsTest.show();
+    Dataset mbsTest = quollUtils.readFile(session,null,"src/test/resources/in/mbsTestData2.csv");
     Dataset mbs = quollUtils.transformMbs(mbsTest);
     assertEquals(3, mbs.count());
     }
