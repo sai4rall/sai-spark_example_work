@@ -1,13 +1,14 @@
 package com.spark.transformations.util;
 
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.expressions.UserDefinedFunction;
 import org.apache.spark.sql.functions;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.IntegerType$;
+
 
 public class UserDefinedFunctions {
     public static UserDefinedFunction eaisectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
-    public static UserDefinedFunction eaiCellStatus = functions.udf((String s) -> QuollUtils.napCellStatus(s), DataTypes.StringType);
+    public static UserDefinedFunction eaiCellStatus = functions.udf((String s) -> QuollUtils.mapCellStatus(s), DataTypes.StringType);
     public static UserDefinedFunction eaiStatus = functions.udf((String s) -> QuollUtils.mapStatus(s), DataTypes.StringType);
     public static UserDefinedFunction eaiCellType = functions.udf((String s) -> QuollUtils.mapCellType(s), DataTypes.StringType);
     public static UserDefinedFunction eaiCellFunction = functions.udf((String s) -> QuollUtils.mapCellFunction(s), DataTypes.StringType);

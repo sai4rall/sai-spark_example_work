@@ -5,7 +5,7 @@ import org.apache.spark.sql.SparkSession;
 public class ClusterConfig {
     public static SparkSession getSparkSession(){
         return SparkSession.builder().appName("QuollTransformations")
-                .master("local[1]")
+//                .master("local[1]")
                 .getOrCreate();
 
     }

@@ -12,12 +12,12 @@ import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
+
 import java.util.Map;
 
 
 public class QuollApp {
     public static void main(String[] args) {
-        System.out.println("Hello ");
 
         Logger.getLogger("org").setLevel(Level.ERROR);
         SparkSession session = ClusterConfig.getSparkSession();
@@ -30,30 +30,19 @@ public class QuollApp {
         Dataset b = quollUtils.readFile(session, QuollSchemas.bbhSpreadsheetSchema, Constants.TEMPEST_NODE_ID_PATH);
 
 
-        Broadcast cellStatusMap = session.sparkContext().broadcast(QuollMapConstants.cellStatusMapDict, QuollUtils.classTag(Map.class));
-        Broadcast statusMapDict = session.sparkContext().broadcast(QuollMapConstants.statusMapDict, QuollUtils.classTag(Map.class));
-        Broadcast cellTypeMap = session.sparkContext().broadcast(QuollMapConstants.cellTypeMapDict, QuollUtils.classTag(Map.class));
-        Broadcast cellFunction = session.sparkContext().broadcast(QuollMapConstants.cellFunctionbict, QuollUtils.classTag(Map.class));
-        Broadcast validscnodes = session.sparkContext().broadcast(QuollMapConstants.validiscNodeDict, QuollUtils.classTag(Map.class));
-        Broadcast areaCode = session.sparkContext().broadcast(QuollMapConstants.areaCodeDict, QuollUtils.classTag(Map.class));
-
-
         q = quollUtils.addAdditionalAttributes(q);
-//q.show();
+
         Dataset sites = quollUtils.cleanlyConvertssitesToInteger(q);
 
-//sites.show();
+
         sites.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site");
 
         Dataset bsc = quollUtils.transformBsc(q);
 
         bsc.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc");
-//                #bsc.show()
 
-//        q.show();
         Dataset rnc = quollUtils.transformRnc(q);
         rnc.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc");
-        rnc.show();
 
 
         Dataset bts = quollUtils.transfromBts(q);
@@ -61,7 +50,7 @@ public class QuollApp {
 
         Dataset bsc_to_bts_lookup = quollUtils.transfromBscToBtsLookup(q);
 
-        //bsc_to_bts_lookup.show()
+
         bsc_to_bts_lookup.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bsc_to_bts_lookup");
 
 
@@ -77,18 +66,15 @@ public class QuollApp {
 
         Dataset gsm = quollUtils.transformGsm(q);
 
-//        gsm.show(10, 0, true);
         gsm.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "gsmCell");
 
 
-        Dataset umts =  quollUtils.transformUmts(q);
-
+        Dataset umts = quollUtils.transformUmts(q);
 
 
         //#umts.show(vertical=True, truncate=False)
         //#umts.coalesce(1).write.csv(path='s3://emrdisco/eai_objects/umtsCell/csv', mode='overwrite', header=True, quoteAll=True)
         umts.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "umtsCell");
-
 
 
         Dataset nr = quollUtils.transformNr(q);
@@ -105,7 +91,7 @@ public class QuollApp {
         site_to_rfCell_lookup.write().mode("overwrite").json(Constants.SITE_TO_RFCELL_LOOKUP_PATH);
 
 
-        Dataset site_to_rfCell =  quollUtils.transformSiteToRfCell(q);
+        Dataset site_to_rfCell = quollUtils.transformSiteToRfCell(q);
 
 
 //#site_to_rfCell.show()
@@ -114,21 +100,7 @@ public class QuollApp {
 
         Broadcast ranNumberingMap = session.sparkContext().broadcast(QuollMapConstants.ranNumberingDict, QuollUtils.classTag(Map.class));
 
-
-        Dataset n = quollUtils.transform4GLRAN(t);
-        n = n.union(quollUtils.transform5GNGRAN(t));
-        n = n.union(quollUtils.transform3GWRAN(t));
-
-
-
-
-        Dataset b2 = (b
-                .withColumn("type", UserDefinedFunctions.eaiBbhType.apply(functions.col("technology")))
-                .withColumn("status", functions.lit("Unknown"))
-                .select(b.col("name"), functions.col("type"), b.col("node_code"), b.col("id"), b.col("virtual_rnc"), functions.col("status"))
-        );
-
-        Dataset bs = quollUtils.joinBsAndn(b2,n);
+        Dataset bs = quollUtils.generateBsDataset(t,b);
 
 //# n.count = 42749
 //# b.count = 5698
@@ -137,34 +109,23 @@ public class QuollApp {
 //#bs.select('type').distinct().show()
 //#bs.orderBy(bs.name).coalesce(1).write.csv(path='s3://emrdisco/eai_objects/baseStation/csv', mode='overwrite', header=True, quoteAll=True)
 //#bs.write.json(path='s3://emrdisco/eai_objects/baseStation', mode='overwrite')
-        Dataset nb_e = session.read().option("header", "true")
-                .schema(QuollSchemas.enmNodeBSchema)
-                .csv(Constants.enm_nodeB_PATH);
+        Dataset nb_e =quollUtils.readFile(session,QuollSchemas.enmNodeBSchema,Constants.enm_nodeB_PATH);
 
 
-        nb_e =quollUtils.transformnbe(nb_e);
+        nb_e = quollUtils.transformnbe(nb_e);
 
-        Dataset enb_e = session.read().schema(QuollSchemas.enmBaseStationSchema)
-                .option("header", "true").csv(Constants.enm_nodeBS_PATH);
+        Dataset enb_e = quollUtils.readFile(session,QuollSchemas.enmBaseStationSchema,Constants.enm_nodeBS_PATH);
 
-        enb_e =quollUtils.transformenbE(enb_e);
-        Dataset gnbd_e = session.read()
-                .option("header", "true")
-                .schema(QuollSchemas.enmBaseStationSchema)
-                .csv(Constants.GNODEB_DU);
+        enb_e = quollUtils.transformenbE(enb_e);
+        Dataset gnbd_e = quollUtils.readFile(session,QuollSchemas.enmBaseStationSchema,Constants.GNODEB_DU);
 
         gnbd_e = quollUtils.transformGnbdE(gnbd_e);
 
-        Dataset gnb_e = gnbd_e;
-        gnb_e = gnb_e.distinct();
-        gnb_e = quollUtils.transformGnbE(gnb_e);
-        Dataset enm = nb_e;
-        enm = enm.union(enb_e);
-        enm = enm.union(gnb_e);
+        Dataset enm = quollUtils.generateEnm(gnbd_e,nb_e,enb_e);
 //        #enm = enm.union(bts.select(bts.name, bts.btsId.alias('id'), bts.type, bts.status, bts.name.alias('nodeCode')))
         Dataset b3 = quollUtils.transformBsToB3(bs);
 
-        Dataset mbs =quollUtils.transformenmToMbs(enm,b3,bs);
+        Dataset mbs = quollUtils.transformenmToMbs(enm, b3, bs);
 
 //#mbs.orderBy(mbs.name).show()
 
@@ -177,34 +138,26 @@ public class QuollApp {
 //#   we now need to split these up again so that we can add in type specific fields
 //#   and also tweak the fields we display
 
-        Dataset nodeB = mbs.where(mbs.col("type").equalTo("ocw/nodeB"))
-                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                        mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
-        Dataset eNodeB = mbs.where(mbs.col("type").equalTo("ocw/eNodeB"))
-                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
-                        mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
-        Dataset gNBDU = mbs.where(mbs.col("type").equalTo("ocw/gnbdu")).select(functions.col("$type"), functions.col("$refId"),
-                functions.col("$action"), mbs.col("id").alias("gnbduId"), mbs.col("name"), mbs.col("status"));
-//#gNBCUUP = mbs.where(mbs.type == 'ocw/gnbcuup').select('$type', '$refId', '$action', mbs.id.alias('gnbcuupId'), mbs.name, mbs.status)
-//
-//
-//#print(nodeB.count())       # 14706
-//#print(eNodeB.count())      # 25490
-//#print(gNBDU.count())       # 1063
-//#print(gNBCUUP.count())     # 3162
-        nodeB.show();
+        Dataset nodeB = quollUtils.transformNodeB(mbs);
+
+
+        Dataset eNodeB = quollUtils.transformENodeB(mbs);
+
+        Dataset gNBDU = quollUtils.transformgNBDU(mbs);
+
+
         nodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "nodeB");
         eNodeB.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "eNodeB");
         gNBDU.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "gNB-DU");
 //#gNBCUUP.write.json(path=bucketUrl + bucketOutputPath + 'gNB-CU-UP', mode='overwrite')
 
-        Dataset bts_to_gsmCell_lookup =quollUtils.transformBtsToGsmCelLoopUP(bts);
+        Dataset bts_to_gsmCell_lookup = quollUtils.transformBtsToGsmCelLoopUP(bts);
 //#bts_to_gsmCell_lookup.show()
         bts_to_gsmCell_lookup.write().mode("overwrite")
                 .json(Constants.bucketUrl + Constants.bucketOutputPath + "bts_to_gsmCell_lookup");
 
 //# backup :   (q.iub_rbsid.isNotNull()) & (q.technology.like('GSM%')) & (q.cell_status != 'Erroneous entry')
-        Dataset bts_to_gsmCell =  quollUtils.transformBtsToGsmCell(q);
+        Dataset bts_to_gsmCell = quollUtils.transformBtsToGsmCell(q);
 
 //#bts_to_gsmCell.show(50)
         bts_to_gsmCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "bts_to_gsmCell");

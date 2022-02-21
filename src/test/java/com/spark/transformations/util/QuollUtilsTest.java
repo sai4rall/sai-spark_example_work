@@ -221,10 +221,10 @@ tespest.show();
 
 
     @Test
-    void napCellStatus() {
-        assertEquals("PENDING DECOMMISSION",QuollUtils.napCellStatus("Inactive"));
-        assertEquals("IN CONCEPT",QuollUtils.napCellStatus("xyz"));
-        assertEquals("IN CONCEPT",QuollUtils.napCellStatus("Concept"));
+    void mapCellStatus() {
+        assertEquals("PENDING DECOMMISSION",QuollUtils.mapCellStatus("Inactive"));
+        assertEquals("IN CONCEPT",QuollUtils.mapCellStatus("xyz"));
+        assertEquals("IN CONCEPT",QuollUtils.mapCellStatus("Concept"));
 
     }
 
@@ -418,5 +418,26 @@ tespest.show();
         Dataset n = quollUtils.readFile(session, null, "src/test/resources/in/mbsTestData.csv");
         assertEquals(3,quollUtils.joinBsAndn(b2, n).count());
     }
+@Test
+    void generateBsDataset(){
+    Dataset b = quollUtils.readFile(session, QuollSchemas.bbhSpreadsheetSchema, Constants.TEMPEST_NODE_ID_PATH);
+
+    Dataset d=quollUtils.generateBsDataset(tespest,b);
+    d.show();
+    assertEquals(4,d.count());
+}
+@Test
+    void generateEnm(){
+    Dataset gnbd_e = session.read()
+            .option("header", "true")
+            .schema(QuollSchemas.enmBaseStationSchema)
+            .csv("src/test/resources/in/enm/enm_gNodeB-DU.csv");
+    gnbd_e=quollUtils.transformGnbdE(gnbd_e);
+
+    Dataset enb_e = session.read().schema(QuollSchemas.enmBaseStationSchema)
+            .option("header", "true").csv("src/test/resources/in/enm/enm_nodeB.csv");
+
+    assertEquals(4,quollUtils.generateEnm(gnbd_e,nb_e,enb_e).count());
+}
 
 }

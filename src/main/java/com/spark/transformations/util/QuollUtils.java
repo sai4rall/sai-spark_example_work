@@ -38,28 +38,28 @@ public class QuollUtils {
     public Dataset applyInitialTrabsformaions(Dataset qdf) {
 //# Add in the sector
         System.out.println("qdf");
-        qdf.show();
         Dataset<Row> q = qdf.select(qdf.col("*"),
                 qdf.col("cell_name").substr(5, 2).alias("utchar"),
                 qdf.col("cell_name").substr(7, 1).alias("sector"));
 
 
-        q = q.drop("bts_instance_display_name", "clli_number_bed", "clli_number_hex",
-                "do_rnc", "multi_nids", "nid", "switch_number", "xrtt_enabled", "cell_fro_id", "cid_hex", "lac_hex", "enbid_hex");
+        q = q.drop("bts_instance_display_name", "clli_number_bcd", "clli_number_hex",
+                "do_rnc", "multi_nids", "nid", "switch_number","zone_timer" ,"xrtt_enabled",
+                "cell_fro_id", "cid_hex", "lac_hex", "enbid_hex");
 
 
-        q.where(q.col("base_station_name").like("%WIFI%")).write().mode("overwrite").json(Constants.WIFI_NNI_PATH);
+
+        q.where(q.col("base_station_name").like("%WIFI%"))
+                .write().mode("overwrite").json(Constants.WIFI_NNI_PATH);
 
 
         q = q.where(functions.not(q.col("base_station_name").like("%WIFI%")));
 
 //        UserDefinedFunction ea1sectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
 
-        q.show();
-        q = q.withColumn("sectorNumber", UserDefinedFunctions.eaisectorNumber.apply(q.col("sector")));
-        q.show();
+        q = q.withColumn("sectorNumber", UserDefinedFunctions.eaisectorNumber.apply(functions.col("sector")));
         q = q.where(functions.not(q.col("cell_status").isin("Erroneous entry", "Removed")));
-        q.show();
+
         return q;
     }
 
@@ -183,7 +183,7 @@ public class QuollUtils {
     }
 
 
-    public static String napCellStatus(String qStatus) {
+    public static String mapCellStatus(String qStatus) {
 //            # note: we cannot have a status on None as the record will not load into EAI
         return QuollMapConstants.cellStatusMapDict.get(qStatus) != null ? QuollMapConstants.cellStatusMapDict.get(qStatus) : QuollMapConstants.cellStatusMapDict.get("Concept");
     }
@@ -741,7 +741,6 @@ public class QuollUtils {
     }
 
     public Dataset transform3GWRAN(Dataset t) {
-        (t.where(t.col("network").isin("3G (WRAN)").and(t.col("rbs_id").isNotNull()))).show();
         return  (t.where(t.col("network").isin("3G (WRAN)").and(t.col("rbs_id").isNotNull()))
                 .withColumn("name", UserDefinedFunctions.eaiNodeBName.apply(functions.col("site_name"), functions.col("node_code")))
                 .withColumn("type", functions.lit("ocw/nodeB"))
@@ -855,5 +854,45 @@ public class QuollUtils {
                 .union(n.join(b2, n.col("name").equalTo(b2.col("name")), "left_anti"))     //  # psudo right_anti
                 .where(functions.col("name").isNotNull())
                 .distinct());
+    }
+
+    public Dataset generateBsDataset(Dataset t, Dataset b) {
+        Dataset n = transform4GLRAN(t);
+        n = n.union(transform5GNGRAN(t));
+        n = n.union(transform3GWRAN(t));
+
+
+        Dataset b2 = (b
+                .withColumn("type", UserDefinedFunctions.eaiBbhType.apply(functions.col("technology")))
+                .withColumn("status", functions.lit("Unknown"))
+                .select(b.col("name"), functions.col("type"), b.col("node_code"), b.col("id"), b.col("virtual_rnc"), functions.col("status"))
+        );
+        return joinBsAndn(b2, n);
+    }
+
+    public Dataset generateEnm(Dataset gnbd_e,Dataset nb_e,Dataset enb_e) {
+        Dataset gnb_e = gnbd_e;
+        gnb_e = gnb_e.distinct();
+        gnb_e = transformGnbE(gnb_e);
+        Dataset enm = nb_e;
+        enm = enm.union(enb_e);
+        return enm.union(gnb_e);
+    }
+
+    public Dataset transformNodeB(Dataset mbs) {
+       return mbs.where(mbs.col("type").equalTo("ocw/nodeB"))
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("nodeBId"), mbs.col("name"), mbs.col("status"));
+    }
+
+    public Dataset transformENodeB(Dataset mbs) {
+       return mbs.where(mbs.col("type").equalTo("ocw/eNodeB"))
+                .select(functions.col("$type"), functions.col("$refId"), functions.col("$action"),
+                        mbs.col("id").alias("eNodeBId"), mbs.col("name"), mbs.col("status"));
+    }
+
+    public Dataset transformgNBDU(Dataset mbs) {
+       return mbs.where(mbs.col("type").equalTo("ocw/gnbdu")).select(functions.col("$type"), functions.col("$refId"),
+                functions.col("$action"), mbs.col("id").alias("gnbduId"), mbs.col("name"), mbs.col("status"));
     }
 }

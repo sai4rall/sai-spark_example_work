@@ -26,6 +26,7 @@ public class QuollSchemas {
             .add("rnc_module_Info",StringType$.MODULE$, true)
             .add("comments", StringType$.MODULE$, true)
             .add("allocated_by",StringType$.MODULE$, true)
+            .add("allocation_date", StringType$.MODULE$, true)
             .add("requested_by", StringType$.MODULE$,true)
             .add("request_date",DateType$.MODULE$, true);
 
