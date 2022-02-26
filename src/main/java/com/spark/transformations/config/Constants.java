@@ -1,6 +1,5 @@
 package com.spark.transformations.config;
 
-import com.spark.transformations.util.QuollUtils;
 import org.apache.spark.broadcast.Broadcast;
 
 import java.util.Map;
@@ -36,13 +35,14 @@ public class Constants {
 
 //    public static String GNODEB_DU="s3://emrdisco/enm/enm_gNodeB-DU.csv";
     public static String GNODEB_DU="/home/hduser/IdeaProjects/QuollTransformations/src/test/resources/in/enm/enm_gNodeB-DU.csv";
-
-    Broadcast cellStatusMap = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellStatusMapDict, QuollUtils.classTag(Map.class));
-    Broadcast statusMapDict = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.statusMapDict, QuollUtils.classTag(Map.class));
-    Broadcast cellTypeMap = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellTypeMapDict, QuollUtils.classTag(Map.class));
-    Broadcast cellFunction = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellFunctionbict, QuollUtils.classTag(Map.class));
-    Broadcast validscnodes = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.validiscNodeDict, QuollUtils.classTag(Map.class));
-    Broadcast areaCode = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.areaCodeDict, QuollUtils.classTag(Map.class));
+//
+//    Broadcast cellStatusMap = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellStatusMapDict, QuollUtils.classTag(Map.class));
+//    Broadcast statusMapDict = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.statusMapDict, QuollUtils.classTag(Map.class));
+//    Broadcast cellTypeMap = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellTypeMapDict, QuollUtils.classTag(Map.class));
+//    Broadcast cellFunction = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.cellFunctionbict, QuollUtils.classTag(Map.class));
+//    Broadcast validscnodes = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.validiscNodeDict, QuollUtils.classTag(Map.class));
+//    Broadcast areaCode = ClusterConfig.getSparkSession().sparkContext().broadcast(QuollMapConstants.areaCodeDict, QuollUtils.classTag(Map.class));
+//Broadcast ranNumberingMap = session.sparkContext().broadcast(QuollMapConstants.ranNumberingDict, QuollUtils.classTag(Map.class));
 
 
 }

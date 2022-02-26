@@ -1,10 +1,12 @@
 package com.spark.transformations.util;
 
+import com.spark.transformations.LookUpData;
+import com.spark.transformations.config.ClusterConfig;
 import com.spark.transformations.config.Constants;
-import com.spark.transformations.config.QuollMapConstants;
 import com.spark.transformations.config.QuollSchemas;
 import org.apache.hadoop.shaded.com.google.common.base.CharMatcher;
 import org.apache.log4j.Logger;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -15,13 +17,23 @@ import org.apache.spark.sql.types.IntegerType$;
 import org.apache.spark.sql.types.StructType;
 import scala.reflect.ClassTag;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class QuollUtils {
-    static Logger logger = Logger.getLogger(QuollUtils.class);
+public class QuollUtils implements Serializable {
+    static  Logger logger = Logger.getLogger(QuollUtils.class);
+    UserDefinedFunctions userDefinedFunctions;
+    Broadcast<LookUpData> lookUpDataBroadcast;
+     public QuollUtils(){
+         LookUpData lookUpData=new LookUpData();
+         lookUpDataBroadcast= ClusterConfig.getSparkSession().sparkContext().broadcast(lookUpData, classTag(LookUpData.class));
+         this.lookUpDataBroadcast=lookUpDataBroadcast;
+         this.userDefinedFunctions=new UserDefinedFunctions(this);
+     }
 
     public Dataset readFile(SparkSession session, StructType schema, String path) {
         if (schema == null) {
@@ -57,7 +69,7 @@ public class QuollUtils {
 
 //        UserDefinedFunction ea1sectorNumber = functions.udf((String s) -> QuollUtils.genSectorNumber(s), DataTypes.IntegerType);
 
-        q = q.withColumn("sectorNumber", UserDefinedFunctions.eaisectorNumber.apply(functions.col("sector")));
+        q = q.withColumn("sectorNumber",   userDefinedFunctions.eaisectorNumber.apply(functions.col("sector")));
         q = q.where(functions.not(q.col("cell_status").isin("Erroneous entry", "Removed")));
 
         return q;
@@ -65,16 +77,16 @@ public class QuollUtils {
 
 
     public Dataset addAdditionalAttributes(Dataset q) {
-        return q.withColumn("|telstraCellAttributes|cellFunction", UserDefinedFunctions.eaiCellFunction.apply(q.col("cell_function"))).
-                withColumn("|telstraCellAttributes|hasSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event_cell"))).
-                withColumn("|telstraCellAttributes|hasSignificantSpecialEvent", UserDefinedFunctions.eaiBool.apply(q.col("special_event"))).
-                withColumn("|telstraCellAttributes|hasPriorityAssistCustomers", UserDefinedFunctions.eaiBool.apply(q.col("priority_assist"))).
-                withColumn("|telstraCellAttributes|hasHighSeasonality", UserDefinedFunctions.eaiBool.apply(q.col("high_seasonality"))).
-                withColumn("|telstraCellAttributes|hasWirelessLocalLoopCustomers", UserDefinedFunctions.eaiBool.apply(q.col("wll"))).
-                withColumn("|telstraCellAttributes|mobileSwitchingCentre", UserDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
+        return q.withColumn("|telstraCellAttributes|cellFunction",   userDefinedFunctions.eaiCellFunction.apply(q.col("cell_function"))).
+                withColumn("|telstraCellAttributes|hasSpecialEvent",  userDefinedFunctions.eaiBool.apply(q.col("special_event_cell"))).
+                withColumn("|telstraCellAttributes|hasSignificantSpecialEvent",  userDefinedFunctions.eaiBool.apply(q.col("special_event"))).
+                withColumn("|telstraCellAttributes|hasPriorityAssistCustomers",  userDefinedFunctions.eaiBool.apply(q.col("priority_assist"))).
+                withColumn("|telstraCellAttributes|hasHighSeasonality",  userDefinedFunctions.eaiBool.apply(q.col("high_seasonality"))).
+                withColumn("|telstraCellAttributes|hasWirelessLocalLoopCustomers",  userDefinedFunctions.eaiBool.apply(q.col("wll"))).
+                withColumn("|telstraCellAttributes|mobileSwitchingCentre",  userDefinedFunctions.eaivalidMscNode.apply(q.col("msc_node"))).
                 withColumn("|telstraCellAttributes|mobileServiceArea", q.col("msa")).
-                withColumn("|telstraCellAttributes|quollIndex", UserDefinedFunctions.eaiInt.apply(q.col("cell_index"))).
-                withColumn("|telstraCellAttributes|closedNumberArea", UserDefinedFunctions.eaiAreaCode.apply(q.col("cna")))
+                withColumn("|telstraCellAttributes|quollIndex",  userDefinedFunctions.eaiInt.apply(q.col("cell_index"))).
+                withColumn("|telstraCellAttributes|closedNumberArea",  userDefinedFunctions.eaiAreaCode.apply(q.col("cna")))
                 .select(q.col("*"),
                         q.col("billing_name").alias("|telstraCellAttributes|billingName"),
                         q.col("roamer").alias("|telstracellAttributes|roamingAgreement"),
@@ -169,7 +181,7 @@ public class QuollUtils {
                         q.col("cell_name").substr(1, 4).alias("name"))
                 .distinct());
     }
-    public static Integer genSectorNumber(String sector) {
+    public Integer genSectorNumber(String sector) {
 
         if (sector != null && !sector.isBlank()) {
             if (Arrays.asList("0", "1", "2", "3", "4", "5", "6", "7", "8", "9").indexOf(sector) > -1) {
@@ -183,25 +195,25 @@ public class QuollUtils {
     }
 
 
-    public static String mapCellStatus(String qStatus) {
+    public String mapCellStatus(String qStatus) {
 //            # note: we cannot have a status on None as the record will not load into EAI
-        return QuollMapConstants.cellStatusMapDict.get(qStatus) != null ? QuollMapConstants.cellStatusMapDict.get(qStatus) : QuollMapConstants.cellStatusMapDict.get("Concept");
+        return lookUpDataBroadcast.getValue().getCellStatusMapDict().get(qStatus) != null ? lookUpDataBroadcast.getValue().getCellStatusMapDict().get(qStatus) : lookUpDataBroadcast.getValue().getCellStatusMapDict().get("Concept");
     }
 
-    public static String mapStatus(String Status) {
+    public String mapStatus(String Status) {
 //          # note: we cannot have a status on None as the record will not load into EAI
-        return QuollMapConstants.statusMapDict.get(Status) != null ? QuollMapConstants.statusMapDict.get(Status) : QuollMapConstants.statusMapDict.get("Unknown");
+        return lookUpDataBroadcast.getValue().getStatusMapDict().get(Status) != null ? lookUpDataBroadcast.getValue().getStatusMapDict().get(Status) : lookUpDataBroadcast.getValue().getStatusMapDict().get("Unknown");
     }
 
-    public static String mapCellType(String qType) {
+    public String mapCellType(String qType) {
 //          # note: we cannot have a status on None as the record will not load into EAI
-        return QuollMapConstants.cellTypeMapDict.get(qType) != null ? QuollMapConstants.cellTypeMapDict.get(qType) : QuollMapConstants.cellTypeMapDict.get("TBA");
+        return lookUpDataBroadcast.getValue().getCellTypeMapDict().get(qType) != null ? lookUpDataBroadcast.getValue().getCellTypeMapDict().get(qType) : lookUpDataBroadcast.getValue().getCellTypeMapDict().get("TBA");
     }
 
-    public static String mapCellFunction(String qFunction) {
+    public String mapCellFunction(String qFunction) {
         if (qFunction != null && isInteger(qFunction)) {
             int temp = Integer.parseInt(qFunction);
-            return QuollMapConstants.cellFunctionbict.get(temp);
+            return lookUpDataBroadcast.getValue().getCellFunctionbict().get(temp);
         } else {
             return null;
         }
@@ -209,7 +221,7 @@ public class QuollUtils {
 
     //    # use eaiInt instead
 //# convert RAC to an int
-    public static Integer cleanRac(String qrac) {
+    public Integer cleanRac(String qrac) {
         if (qrac != null && isInteger(qrac)) {
             return Integer.parseInt(qrac);
         } else {
@@ -217,12 +229,12 @@ public class QuollUtils {
         }
     }
 
-    public static String validateMscNode(String node) {
-        return node != null ? QuollMapConstants.validiscNodeDict.get(node) : null;
+    public String validateMscNode(String node) {
+        return node != null ? lookUpDataBroadcast.getValue().getValidiscNodeDict().get(node) : null;
     }
 
     //        # convert a string flag into a Boolean
-    public static boolean cleanBool(String qVal) {
+    public boolean cleanBool(String qVal) {
         if (qVal != null &&
                 (qVal.toUpperCase().equalsIgnoreCase("TRUE") ||
                         (qVal.toUpperCase().equalsIgnoreCase("SIGNIFICANT")))) {
@@ -232,7 +244,7 @@ public class QuollUtils {
         }
     }
 
-    public static String cleanYN(String qVal) {
+    public String cleanYN(String qVal) {
         if (qVal != null &&
                 (qVal.toUpperCase().equalsIgnoreCase("TRUE"))) {
             return "YES";
@@ -243,7 +255,7 @@ public class QuollUtils {
     }
 
     //    # the LAC needs to be converted to Int in the range 1->65,535. Values of are to be changed to None.
-    public static Integer cleanLac(String qval) {
+    public Integer cleanLac(String qval) {
         if (qval != null && isInteger(qval)) {
             Integer lac = Integer.parseInt(qval);
             if (lac > 0)
@@ -258,7 +270,7 @@ public class QuollUtils {
 
     //TODO needto check why we have two implementations for cleanRacVal
 //# the RAC needs to be converted to Int in the range 0->255. Values above 255 are changed to None
-    public static Integer cleanRacVal(String qval) {
+    public Integer cleanRacVal(String qval) {
         if (qval != null && isInteger(qval)) {
             Integer rac = Integer.parseInt(qval);
             if (rac < 255)
@@ -271,7 +283,7 @@ public class QuollUtils {
         }
     }
 
-    public static Integer cleanInt(String qval) {
+    public Integer cleanInt(String qval) {
         if (qval != null && isInteger(qval)) {
             return Integer.parseInt(qval);
         } else {
@@ -280,10 +292,10 @@ public class QuollUtils {
         }
     }
 
-    public static String mapAreaCode(String qAc) {
+    public String mapAreaCode(String qAc) {
         if (qAc != null && isInteger(qAc)) {
             Integer ac = Integer.parseInt(qAc);
-            return QuollMapConstants.areaCodeDict.get(ac);
+            return lookUpDataBroadcast.getValue().getAreaCodeDict().get(ac);
         } else {
             logger.info("Error converting area code" + qAc);
             return null;
@@ -291,7 +303,7 @@ public class QuollUtils {
     }
 
 
-    public static Integer cleanUra(String qStr) {
+    public Integer cleanUra(String qStr) {
         if (qStr == null) {
             return null;
         } else {
@@ -305,11 +317,11 @@ public class QuollUtils {
         }
     }
 
-    public static <T> ClassTag<T> classTag(Class<T> clazz) {
+    public <T> ClassTag<T> classTag(Class<T> clazz) {
         return scala.reflect.ClassManifestFactory.fromClass(clazz);
     }
 
-    public static boolean isInteger(String s) {
+    public boolean isInteger(String s) {
         try {
             Integer.parseInt(s);
         } catch (NumberFormatException e) {
@@ -319,7 +331,7 @@ public class QuollUtils {
         return true;
     }
 
-    public static String technologyToType(String sTech) {
+    public String technologyToType(String sTech) {
         if (sTech != null && !sTech.isBlank()) {
             if (sTech.indexOf("NR") > -1)
                 return "On/nrCell";
@@ -337,7 +349,7 @@ public class QuollUtils {
         }
     }
 
-    public static String getBbhType(String tech) {
+    public String getBbhType(String tech) {
         if (tech == null)
             return null;
         else {
@@ -352,7 +364,7 @@ public class QuollUtils {
     }
 
 
-    public static Integer cleanTechnology(String qStr) {
+    public Integer cleanTechnology(String qStr) {
         if (qStr == null) {
             return null;
         } else {
@@ -366,7 +378,7 @@ public class QuollUtils {
             }
         }
     }
-    public static String genEGNodeBName(String du, String site, Integer nid, String nodeCode) {
+    public String genEGNodeBName(String du, String site, Integer nid, String nodeCode) {
         /*
         UDF for building the DU if there is no exsting du field.
          */
@@ -381,7 +393,7 @@ public class QuollUtils {
                 if (m2d.find()){
                     site = site.substring(m2d.start());
                     incChar = ""+site.replaceAll("[^0-9]", "");
-                    incChar = QuollMapConstants.ranNumberingDict.get(incChar);   //# convert to a character
+                    incChar = lookUpDataBroadcast.getValue().getRanNumberingDict().get(incChar);   //# convert to a character
                 }else if(m1d.find()){
                     site = site.substring(m1d.start());
                     incChar = ""+site.replaceAll("[^0-9]", "");
@@ -422,7 +434,7 @@ public class QuollUtils {
     }
 
 
-    public static String genNodeBName(String site, String nodeCode) {
+    public String genNodeBName(String site, String nodeCode) {
         try {
             Pattern pattern = Pattern.compile("\\([1-9]\\)");
             Matcher m = pattern.matcher(site);
@@ -436,7 +448,7 @@ public class QuollUtils {
             if(m.find()){
                 site = site.substring(m.start());
                 String incChar = ""+site.replaceAll("[^0-9]", "");
-                return nodeCode + QuollMapConstants.ranNumberingDict.get(incChar);
+                return nodeCode + lookUpDataBroadcast.getValue().getRanNumberingDict().get(incChar);
             }
 
             return nodeCode + "1";
@@ -446,7 +458,7 @@ public class QuollUtils {
     }
 
 
-    public static String extractNameFromMecontext(String qStr, Boolean paddOne) {
+    public String extractNameFromMecontext(String qStr, Boolean paddOne) {
         if (paddOne == null) {
             paddOne = false;
         }
@@ -472,7 +484,8 @@ public class QuollUtils {
         }
     }
 
-    public static Integer extractIdFromMecontext(String qStr) {
+    public Integer extractIdFromMecontext(String qStr) {
+
         if (qStr == null) {
             return null;
         } else {
@@ -486,7 +499,7 @@ public class QuollUtils {
         }
     }
 
-    public static String enmGnbType(String mecontext) {
+    public String enmGnbType(String mecontext) {
         if (mecontext == null) {
             return null;
         }
@@ -504,9 +517,9 @@ public class QuollUtils {
         return (q.where((q.col("technology").like("LTE%")).and(q.col("rru_donor_node").isin("remote", "neither")))
                 .withColumn("$type", functions.lit("ocw/lteCell"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status"))) // ocw:telstraWirelessDeploymentStatusPicklist
-                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //ocw:telstraCellTypePicklist
-                .withColumn("|telstraLteCellAttributes|trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))
+                .withColumn("status",  userDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status"))) // ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType",  userDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //ocw:telstraCellTypePicklist
+                .withColumn("|telstraLteCellAttributes|trackingAreaCode",  userDefinedFunctions.eaiInt.apply(functions.col("tac")))
 //                # To keep here as per NNI-1336 and NNI-1622
                 .withColumn("qualifiedCellId", functions.expr("conv(eci, 16, 10)"))
 //                 # Convert eci from hex to decimal
@@ -553,14 +566,14 @@ public class QuollUtils {
         return   (q.where((q.col("technology").like("GSM%")).and(q.col("rru_donor_node").isin("remote", "neither")))
                 .withColumn("$type", functions.lit("ocw/gsmCell"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))// # ocw:telstraWirelessDeploymentStatusPicklist
-                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //# ocw:telstraCellTypePicklist
+                .withColumn("status",  userDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))// # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType",  userDefinedFunctions.eaiCellType.apply(functions.col("base_station_type"))) //# ocw:telstraCellTypePicklist
 //                .withColumn("lac", eaiLac(functions.col("lac_dec")))
-                .withColumn("egprsActivated", UserDefinedFunctions.eaiYN.apply(functions.col("edge")))// # values are Yes/No
-                .withColumn("|telstraGsmCellAttributes|evdoEnabled", UserDefinedFunctions.eaiBool.apply(functions.col("evdo")))
-                .withColumn("gprsActivated", UserDefinedFunctions.eaiYN.apply(functions.col("gprs"))) //# values are Yes/No
-                .withColumn("rac", UserDefinedFunctions.eaiInt.apply(functions.col("rac_dec")))
-                .withColumn("|telstraGsmCellAttributes|broadcastCode", UserDefinedFunctions.eaiInt.apply(functions.col("code_for_cell_broadcast")))
+                .withColumn("egprsActivated",  userDefinedFunctions.eaiYN.apply(functions.col("edge")))// # values are Yes/No
+                .withColumn("|telstraGsmCellAttributes|evdoEnabled",  userDefinedFunctions.eaiBool.apply(functions.col("evdo")))
+                .withColumn("gprsActivated",  userDefinedFunctions.eaiYN.apply(functions.col("gprs"))) //# values are Yes/No
+                .withColumn("rac",  userDefinedFunctions.eaiInt.apply(functions.col("rac_dec")))
+                .withColumn("|telstraGsmCellAttributes|broadcastCode",  userDefinedFunctions.eaiInt.apply(functions.col("code_for_cell_broadcast")))
                 .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
                         functions.col("$action"), q.col("cell_name").alias("name"),
                         functions.col("status"),
@@ -601,12 +614,12 @@ public class QuollUtils {
        return (q.where((q.col("technology").like("WCDMA%")).and(q.col("rru_donor_node").isin("remote", "neither")))
                 .withColumn("$type", functions.lit("ocw/umtsCell"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                        //       # ocw:telstraWirelessDeploymentStatusPicklist
-                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                     //# ocw:telstraCellTypePicklist
+                .withColumn("status",  userDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                        //       # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType",  userDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                     //# ocw:telstraCellTypePicklist
 //                 .withColumn("lac", eaiLac(functions.col("lac_dec")))
-                .withColumn("rac", UserDefinedFunctions.eaiRac.apply(functions.col("rac_dec")))
-                .withColumn("ura", UserDefinedFunctions.eaiUra.apply(functions.col("ura")))
-                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                              //  # Convert string to int via udf
+                .withColumn("rac",  userDefinedFunctions.eaiRac.apply(functions.col("rac_dec")))
+                .withColumn("ura",  userDefinedFunctions.eaiUra.apply(functions.col("ura")))
+                .withColumn("trackingAreaCode",  userDefinedFunctions.eaiInt.apply(functions.col("tac")))                              //  # Convert string to int via udf
                 .select(functions.col("$type"), q.col("cell_name").alias("$refId"),
                         functions.col("$action"), q.col("cell_name").alias("name"), functions.col("status"),
                         functions.concat(functions.substring(q.col("technology"), 6, 99),
@@ -650,12 +663,12 @@ public class QuollUtils {
         return (q.where((q.col("technology").like("NR%")).and(q.col("rru_donor_node").isin("remote", "neither")))
                 .withColumn("$type", functions.lit("ocw/nrCell"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
-                .withColumn("status", UserDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                            //   # ocw:telstraWirelessDeploymentStatusPicklist
-                .withColumn("cellType", UserDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                 //    # ocw:telstraCellTypePicklist
-                .withColumn("bsChannelBandwidthDownlink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
-                .withColumn("bsChannelBandwidthUplink", UserDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("status",  userDefinedFunctions.eaiCellStatus.apply(functions.col("cell_status")))                            //   # ocw:telstraWirelessDeploymentStatusPicklist
+                .withColumn("cellType",  userDefinedFunctions.eaiCellType.apply(functions.col("base_station_type")))                 //    # ocw:telstraCellTypePicklist
+                .withColumn("bsChannelBandwidthDownlink",  userDefinedFunctions.eaiChannel.apply(functions.col("technology")))
+                .withColumn("bsChannelBandwidthUplink",  userDefinedFunctions.eaiChannel.apply(functions.col("technology")))
                 .withColumn("localCellIdNci", functions.expr("conv(eci, 16, 10)"))                        //  # Convert eci from hex to decimal
-                .withColumn("trackingAreaCode", UserDefinedFunctions.eaiInt.apply(functions.col("tac")))                             //   # Convert string to int via udf
+                .withColumn("trackingAreaCode",  userDefinedFunctions.eaiInt.apply(functions.col("tac")))                             //   # Convert string to int via udf
                 .select(functions.col("$type"), q.col("cell_name").alias("$refId"), functions.col("$action"), q.col("cell_name").alias("name"), functions.col("status"),
                         functions.col("bsChannelBandwidthDownlink"), functions.col("bsChannelBandwidthUplink"),
                         functions.col("cellType"), functions.col("localCellIdNci"), functions.col("trackingAreaCode"),
@@ -701,7 +714,7 @@ public class QuollUtils {
 
     public Dataset transformSiteToRfCell(Dataset q) {
         return (q.where((q.col("rru_donor_node").isin("remote", "neither")))
-                .withColumn("$type", UserDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
+                .withColumn("$type",  userDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
                 .withColumn("$action", functions.lit("createOrUpdate"))
                 .withColumn("$site", functions.array(functions.col("base_station_name")))
                 .select(functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
@@ -712,7 +725,7 @@ public class QuollUtils {
 
     public Dataset transform4GLRAN(Dataset t) {
         return (t.where(t.col("network").isin("4G (LRAN)").and(t.col("rbs_id").isNotNull()))
-                .withColumn("name", UserDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("rbs_id"), functions.col("node_code")))
+                .withColumn("name",  userDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("rbs_id"), functions.col("node_code")))
                 .withColumn("type", functions.lit("ocw/eNodeB"))
                 .select(functions.col("name"), functions.col("type"), t.col("node_code"),
                         t.col("rbs_id").alias("id"), t.col("virtual_rnc"), //  # t.site_name,
@@ -729,7 +742,7 @@ public class QuollUtils {
 
     public Dataset transform5GNGRAN(Dataset t) {
         return (t.where(t.col("network").isin("5G (NGRAN)").and(t.col("gnb_id").isNotNull()))
-                .withColumn("name", UserDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("gnb_id"), functions.col("node_code")))
+                .withColumn("name",  userDefinedFunctions.eaiEGNodeBName.apply(functions.col("du_number"), functions.col("site_name"), functions.col("gnb_id"), functions.col("node_code")))
                 .withColumn("type", functions.lit("ocw/gnbdu"))
                 .select(functions.col("name"), functions.col("type"), t.col("node_code"),
                         t.col("gnb_id").alias("id"), t.col("virtual_rnc"),  // # t.site_name,
@@ -742,7 +755,7 @@ public class QuollUtils {
 
     public Dataset transform3GWRAN(Dataset t) {
         return  (t.where(t.col("network").isin("3G (WRAN)").and(t.col("rbs_id").isNotNull()))
-                .withColumn("name", UserDefinedFunctions.eaiNodeBName.apply(functions.col("site_name"), functions.col("node_code")))
+                .withColumn("name",  userDefinedFunctions.eaiNodeBName.apply(functions.col("site_name"), functions.col("node_code")))
                 .withColumn("type", functions.lit("ocw/nodeB"))
                 .select(functions.col("name"), functions.col("type"), t.col("node_code"),
                         t.col("rbs_id").alias("id"), t.col("virtual_rnc"),// #  t.site_name,
@@ -755,8 +768,8 @@ public class QuollUtils {
 
     public Dataset transformnbe(Dataset nb_e) {
         return (nb_e
-                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
-                .withColumn("id", UserDefinedFunctions.eaiIdFromMecontext.apply(functions.col("mecontext")))
+                .withColumn("name",  userDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .withColumn("id",  userDefinedFunctions.eaiIdFromMecontext.apply(functions.col("mecontext")))
                 .withColumn("type", functions.lit("ocw/nodeB"))
                 .withColumn("status", functions.lit("In Service"))
                 .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
@@ -767,7 +780,7 @@ public class QuollUtils {
 
     public Dataset transformenbE(Dataset enb_e) {
         return (enb_e
-                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .withColumn("name",  userDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
                 .withColumn("type", functions.lit("ocw/eNodeB"))
                 .withColumn("status", functions.lit("In Service"))
                 .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
@@ -778,14 +791,14 @@ public class QuollUtils {
 
     public Dataset transformGnbdE(Dataset gnbd_e) {
         return  (gnbd_e
-                .withColumn("name", UserDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
+                .withColumn("name",  userDefinedFunctions.eaiNameFromMecontext.apply(functions.col("mecontext"), functions.lit(true)))
                 .select(functions.col("name"), functions.col("id"), gnbd_e.col("mecontext"))
                 .where(functions.col("id").isNotNull()));
     }
 
     public Dataset transformGnbE(Dataset gnb_e) {
        return  (gnb_e
-                .withColumn("type", UserDefinedFunctions.eaiEnmGnbType.apply(functions.col("mecontext")))
+                .withColumn("type",  userDefinedFunctions.eaiEnmGnbType.apply(functions.col("mecontext")))
                 .withColumn("status", functions.lit("In Service"))
                 .select(functions.col("name"), functions.col("id"), functions.col("type"), functions.col("status"),
                         functions.substring(functions.col("name"), 1, 4).alias("nodeCode"))
@@ -817,7 +830,7 @@ public class QuollUtils {
     public Dataset transformMbs(Dataset mbs) {
         return (mbs
                 .select(mbs.col("id"), mbs.col("name"), mbs.col("type"), mbs.col("status").alias("tmp"), mbs.col("nodeCode"))
-                .withColumn("status", UserDefinedFunctions.eaiStatus.apply(functions.col("tmp")))
+                .withColumn("status",  userDefinedFunctions.eaiStatus.apply(functions.col("tmp")))
                 .withColumn("$refId", functions.col("name"))
                 .withColumn("$type", functions.col("type"))
                 .withColumn("$action", functions.lit("createOrUpdate"))
@@ -863,7 +876,7 @@ public class QuollUtils {
 
 
         Dataset b2 = (b
-                .withColumn("type", UserDefinedFunctions.eaiBbhType.apply(functions.col("technology")))
+                .withColumn("type",  userDefinedFunctions.eaiBbhType.apply(functions.col("technology")))
                 .withColumn("status", functions.lit("Unknown"))
                 .select(b.col("name"), functions.col("type"), b.col("node_code"), b.col("id"), b.col("virtual_rnc"), functions.col("status"))
         );
@@ -875,7 +888,14 @@ public class QuollUtils {
         gnb_e = gnb_e.distinct();
         gnb_e = transformGnbE(gnb_e);
         Dataset enm = nb_e;
+     //   enm.show();//|mecontext|
+     //   enb_e.show();//|mecontext|  id|
+
+
         enm = enm.union(enb_e);
+        System.out.println("000000000000000000000");
+        enm.show();
+        gnb_e.show();
         return enm.union(gnb_e);
     }
 

@@ -2,7 +2,6 @@ package com.spark.transformations;
 
 import com.spark.transformations.config.ClusterConfig;
 import com.spark.transformations.config.Constants;
-import com.spark.transformations.config.QuollMapConstants;
 import com.spark.transformations.config.QuollSchemas;
 import com.spark.transformations.util.QuollUtils;
 import com.spark.transformations.util.UserDefinedFunctions;
@@ -20,6 +19,7 @@ public class QuollApp {
     public static void main(String[] args) {
 
         Logger.getLogger("org").setLevel(Level.ERROR);
+
         SparkSession session = ClusterConfig.getSparkSession();
         QuollUtils quollUtils = new QuollUtils();
 
@@ -98,7 +98,6 @@ public class QuollApp {
         site_to_rfCell.write().mode("overwrite").json(Constants.bucketUrl + Constants.bucketOutputPath + "site_to_rfCell");
 
 
-        Broadcast ranNumberingMap = session.sparkContext().broadcast(QuollMapConstants.ranNumberingDict, QuollUtils.classTag(Map.class));
 
         Dataset bs = quollUtils.generateBsDataset(t,b);
 

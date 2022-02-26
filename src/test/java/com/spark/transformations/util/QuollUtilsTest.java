@@ -1,7 +1,9 @@
 package com.spark.transformations.util;
 
+import com.spark.transformations.LookUpData;
 import com.spark.transformations.config.Constants;
 import com.spark.transformations.config.QuollSchemas;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
@@ -19,6 +21,8 @@ class QuollUtilsTest {
     Dataset nb_e;
     @BeforeEach
     void setUp() {
+        LookUpData lookUpData=new LookUpData();
+
         session = SparkSession.builder().appName("QuollTransformationsTest")
                 .master("local[1]")
                 .getOrCreate();
@@ -212,42 +216,42 @@ tespest.show();
 }
     @Test
     void genSectorNumber() {
-        assertEquals(1,QuollUtils.genSectorNumber("1"));
-        assertEquals(null,QuollUtils.genSectorNumber("  "));
-        assertEquals(null,QuollUtils.genSectorNumber(" b "));
-        assertEquals(null,QuollUtils.genSectorNumber(null));
+        assertEquals(1, quollUtils.genSectorNumber("1"));
+        assertEquals(null, quollUtils.genSectorNumber("  "));
+        assertEquals(null, quollUtils.genSectorNumber(" b "));
+        assertEquals(null, quollUtils.genSectorNumber(null));
 
     }
 
 
     @Test
     void mapCellStatus() {
-        assertEquals("PENDING DECOMMISSION",QuollUtils.mapCellStatus("Inactive"));
-        assertEquals("IN CONCEPT",QuollUtils.mapCellStatus("xyz"));
-        assertEquals("IN CONCEPT",QuollUtils.mapCellStatus("Concept"));
+        assertEquals("PENDING DECOMMISSION", quollUtils.mapCellStatus("Inactive"));
+        assertEquals("IN CONCEPT", quollUtils.mapCellStatus("xyz"));
+        assertEquals("IN CONCEPT", quollUtils.mapCellStatus("Concept"));
 
     }
 
     @Test
     void mapStatus() {
-        assertEquals("PENDING",QuollUtils.mapStatus("Commissioning"));
-        assertEquals("PENDING",QuollUtils.mapStatus("xyz"));
-        assertEquals("PENDING DECOMMISSION",QuollUtils.mapStatus("Pending Delete"));
+        assertEquals("PENDING", quollUtils.mapStatus("Commissioning"));
+        assertEquals("PENDING", quollUtils.mapStatus("xyz"));
+        assertEquals("PENDING DECOMMISSION", quollUtils.mapStatus("Pending Delete"));
 
     }
 
     @Test
     void mapCellType() {
-        assertEquals("MACRO",QuollUtils.mapCellType("xyz"));
-        assertEquals("MACRO",QuollUtils.mapCellType("TBA"));
-        assertEquals("IN BUILDING CELL",QuollUtils.mapCellType("IBC"));
+        assertEquals("MACRO", quollUtils.mapCellType("xyz"));
+        assertEquals("MACRO", quollUtils.mapCellType("TBA"));
+        assertEquals("IN BUILDING CELL", quollUtils.mapCellType("IBC"));
 
     }
 
 
     @Test
     void mapCellFunction() {
-        assertEquals("Coverage",quollUtils.mapCellFunction("1"));
+        assertEquals("Coverage", quollUtils.mapCellFunction("1"));
         assertEquals(null,quollUtils.mapCellFunction("1a"));
     }
 
@@ -430,14 +434,14 @@ tespest.show();
     void generateEnm(){
     Dataset gnbd_e = session.read()
             .option("header", "true")
-            .schema(QuollSchemas.enmBaseStationSchema)
-            .csv("src/test/resources/in/enm/enm_gNodeB-DU.csv");
-    gnbd_e=quollUtils.transformGnbdE(gnbd_e);
+            .csv("src/test/resources/in/enm/gnbd_e.csv");
+    Dataset nbe=session.read().option("header","true")
+            .csv("src/test/resources/in/enm/nb_e.csv");
+    Dataset enb_e=session.read().option("header","true")
+            .csv("src/test/resources/in/enm/enb_e.csv");
 
-    Dataset enb_e = session.read().schema(QuollSchemas.enmBaseStationSchema)
-            .option("header", "true").csv("src/test/resources/in/enm/enm_nodeB.csv");
-
-    assertEquals(4,quollUtils.generateEnm(gnbd_e,nb_e,enb_e).count());
+    gnbd_e.show();
+    assertEquals(7,quollUtils.generateEnm(gnbd_e,nbe,enb_e).count());
 }
 
 }
