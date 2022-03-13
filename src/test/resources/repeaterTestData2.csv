@@ -1,0 +1,5 @@
+rru_donor_node,active_repeater_donor_node,technology,cell_name,cell_status,base_station_type,priority_assist,wll,embargo_flag,special_event_cell,special_event,high_seasonality,msa,cell_index,technology,cell_inservice_date,coverage_classification,coverage_statement,optimisation_cluster,owner,note
+repeater1,testrepeater_donor1,LTE1,test1,Concept,Macro,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,msa12,120,LTE,01-01-2022,12,EE,TEST,owner1,testnote1
+repeater,testrepeater_donor2,LTE2,test2,Concept,Macro,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,msa12,120,LTE,01-01-2022,12,EEE,TEST,owner2,testnote2
+repeater,testrepeater_donor3,LTE,test3,Concept,Macro,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,msa12,120,LTE,01-01-2022,12,EEEE,TEST,owner3,testnote3
+repeater,testrepeater_donor,LTE,test4,Concept,Macro,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,msa12,120,LTE,01-01-2022,12,EEEEE,TEST,owner4,testnote4
