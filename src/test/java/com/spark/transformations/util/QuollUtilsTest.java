@@ -443,5 +443,21 @@ tespest.show();
     gnbd_e.show();
     assertEquals(7,quollUtils.generateEnm(gnbd_e,nbe,enb_e).count());
 }
+@Test
+    void transformrfCellToRepeaterLookUp(){
+    Dataset q1 = session.read()
+            .option("header", "true")
+            .csv("src/test/resources/repeaterTestData.csv");
+    assertEquals(3,quollUtils.transformrfCellToRepeaterLookUp(q1).count());
+
+}
+@Test
+    void transformrfCellToRepeater(){
+    Dataset q1 = session.read()
+            .option("header", "true")
+            .csv("src/test/resources/repeaterTestData.csv");
+    assertEquals(3,quollUtils.transformrfCellToRepeater(q1).count());
+}
+
 
 }

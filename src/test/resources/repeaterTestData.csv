@@ -1,0 +1,5 @@
+rru_donor_node,active_repeater_donor_node,technology,cell_name,
+repeater1,testrepeater_donor1,LTE1,test1
+repeater,testrepeater_donor2,LTE2,test2
+repeater,testrepeater_donor3,LTE,test3
+repeater,testrepeater_donor,LTE,test4

@@ -915,4 +915,33 @@ public class QuollUtils implements Serializable {
        return mbs.where(mbs.col("type").equalTo("ocw/gnbdu")).select(functions.col("$type"), functions.col("$refId"),
                 functions.col("$action"), mbs.col("id").alias("gnbduId"), mbs.col("name"), mbs.col("status"));
     }
+
+
+
+
+
+    public Dataset transformrfCellToRepeaterLookUp(Dataset q){
+
+        return (q.where((q.col("rru_donor_node").isin("repeater")).and(q.col("active_repeater_donor_node").isNotNull()))
+                .withColumn("$type", userDefinedFunctions.eaiTechnologyToType.apply(functions.col("technology")))
+                .withColumn("$action", functions.lit("lookup"))
+                .select(functions.col("$type"), functions.col("$action"),
+                        q.col("active_repeater_donor_node").alias("$refId"),
+                        q.col("active_repeater_donor_node").alias("name")
+                )
+                .distinct()
+        );
+    }
+
+    public Dataset transformrfCellToRepeater(Dataset q){
+        return (q.where((q.col("rru_donor_node").isin("repeater")).and(q.col("active_repeater_donor_node").isNotNull()))
+                .withColumn("$type", functions.lit("ocw/repeater"))
+                .withColumn("$action", functions.lit("createOrUpdate"))
+                .withColumn("$refCell", functions.array(functions.col("active_repeater_donor_node")))
+                .select(functions.col("$type"), functions.col("$action"), q.col("cell_name").alias("$refId"),
+                        q.col("cell_name").alias("name"), functions.col("$refCell")
+                )
+                .distinct()
+        );
+    }
 }
