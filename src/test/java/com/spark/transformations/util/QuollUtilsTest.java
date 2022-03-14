@@ -459,5 +459,13 @@ tespest.show();
     assertEquals(3,quollUtils.transformrfCellToRepeater(q1).count());
 }
 
+    @Test
+    public void transformRepeater() {
+    Dataset q = session.read()
+            .option("header", "true")
+            .csv("src/test/resources/repeaterTestData2.csv");
+    assertEquals(3,quollUtils.transformRepeater(q).count());
+    }
+
 
 }
