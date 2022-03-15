@@ -1,0 +1,114 @@
+{
+  "Comment": "Quoal App SparkExecution",
+  "StartAt": "SPIN_UP_THE_CLUSTER",
+  "States": {
+    "SPIN_UP_THE_CLUSTER": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:createCluster.sync",
+      "Parameters": {
+        "Name": "testSpark",
+        "VisibleToAllUsers":true,
+        "ReleaseLabel": "emr-6.3.0",
+        "Applications": [
+          {
+            "Name": "Spark"
+          },
+          {
+            "Name": "Hive"
+          },{
+            "Name":"Presto"
+          }
+        ],
+        "Tags":[
+          {
+            "Key":"app",
+            "Value":"emr"
+          },
+          {
+            "Key":"Name",
+            "Value":"testSpark"
+          }
+        ],
+        "Configurations":[
+          {
+          "Classification":"emrfs-site",
+          "Properties":{
+          "fs.s3.enableServerSideEncryption":"true",
+          "fs.s3.maxRetries":"20"
+          }
+          },
+          {
+            "Classification":"spark-log4j",
+            "Properties":{
+              "log4j.rootCategory":"ERROR,console",
+              "log4j.appender.console.target":"System.out",
+              "log4j.appender.console.layout":"org.apache.log4j.ConsoleAppender",
+              "log4j.appender.console.layout":"org.apache.log4j.PatternLayout",
+              "log4j.appender.console.layout.ConversionPattern":"%d{yy/MM/dd HH:mm:ss} %p %c{1} %m %n"
+            }
+          }
+        ],
+        "ServiceRole": "EMR_DefaultRole",
+        "JobFlowRole": "EMR_EC2_DefaultRole",
+        "LogUri": "s3://testbucketsai4r",
+        "VisibleToAllUsers": true,
+        "Instances": {
+          "KeepJobFlowAliveWhenNoSteps": true,
+          "InstanceFleets": [
+            {
+              "InstanceFleetType": "MASTER",
+              "Name": "Master",
+              "TargetOnDemandCapacity": 1,
+              "InstanceTypeConfigs": [
+                {
+                  "InstanceType": "m4.large"
+                }
+              ]
+            },
+            {
+              "InstanceFleetType": "CORE",
+              "Name": "CORE",
+              "TargetOnDemandCapacity": 1,
+              "InstanceTypeConfigs": [
+                {
+                  "InstanceType": "m4.large"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.cluster",
+      "Next": "SPARK_JOB"
+    },
+    "SPARK_JOB": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
+      "Parameters": {
+        "ClusterId.$": "$.cluster.ClusterId",
+        "Step": {
+          "Name": "TESTSPARKSTEP",
+          "ActionOnFailure": "TERMINATE_CLUSTER",
+          "HadoopJarStep": {
+            "Jar": "command-runner.jar",
+            "Args": [
+              "bash",
+              "-c",
+              "spark-submit --class=com.sai.testdeploy.SaiTest s3://stepfunctiontests/sparkdeploy3.jar  s3://saisparktest/in/test.csv /tmp/intermidiate2.txt  s3://saisparktest/test123456/"
+            ]
+          }
+        }
+      },
+      "ResultPath":"$.SPARK_OP",
+       "Next": "TERMINATE_CLUSTER"
+    },
+       "TERMINATE_CLUSTER": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:terminateCluster",
+      "Parameters": {
+        "ClusterId.$": "$.cluster.ClusterId"
+      },
+      "End": true
+    }
+  }
+}
